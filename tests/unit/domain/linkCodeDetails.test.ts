@@ -8,6 +8,7 @@ import {
 describe('Link Code details', () => {
   it('trims names and normalizes redirect URLs', () => {
     expect(normalizeLinkCodeDetails({
+      code: ' go ',
       displayName: ' Launch page ',
       id: ' link-code-id ',
       responseConfig: {
@@ -15,6 +16,7 @@ describe('Link Code details', () => {
         redirectUrl: ' https://example.com/launch '
       }
     })).toEqual({
+      code: 'go',
       displayName: 'Launch page',
       id: 'link-code-id',
       responseConfig: {
@@ -62,6 +64,18 @@ describe('Link Code details', () => {
         redirectUrl: 'javascript:alert(1)'
       }
     })).toThrow(/http/)
+  })
+
+  it('validates custom Link Code strings when present', () => {
+    expect(() => normalizeLinkCodeDetails({
+      code: 'bad code',
+      displayName: 'Launch page',
+      id: 'link-code-id',
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: 'https://example.com'
+      }
+    })).toThrow(/letters, numbers/)
   })
 
   it('normalizes raw content metadata', () => {

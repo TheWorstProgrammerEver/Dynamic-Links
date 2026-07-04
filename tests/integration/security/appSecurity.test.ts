@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { appRequestIdentifiers, appRequestNames } from '../../../common/appRequestIdentifiers'
@@ -63,6 +64,8 @@ const selectLinkCodes = async (client: SupabaseClient) => {
 
 const ids = (rows: Array<{ id: string }>) => rows.map((row) => row.id)
 
+const shortCustomCode = () => randomUUID().replaceAll('-', '').slice(0, 6)
+
 const deleteLinkCode = async (id?: string) => {
   if (!id) {
     return
@@ -103,6 +106,13 @@ describe('app security integration', () => {
       .limit(10)
 
     expect(data ?? []).toHaveLength(0)
+
+    const premiumEntitlements = await anonymousClient
+      .from('manual_premium_entitlements')
+      .select('user_id')
+      .limit(10)
+
+    expect(premiumEntitlements.error || (premiumEntitlements.data ?? []).length === 0).toBeTruthy()
   })
 
   test('anonymous users cannot directly create Link Codes', async () => {
@@ -126,6 +136,12 @@ describe('app security integration', () => {
 
     expect(ownerError).toBeFalsy()
     expect(outsiderError).toBeFalsy()
+    expect(ownerState.capabilities).toEqual({
+      canEditCustomLinkCodes: true
+    })
+    expect(outsiderState.capabilities).toEqual({
+      canEditCustomLinkCodes: false
+    })
     expect(ids(ownerState.linkCodes)).toEqual([securityFixture.linkCodes.visible])
     expect(ids(outsiderState.linkCodes)).toEqual([securityFixture.linkCodes.hidden])
     expect(ownerState.linkCodes[0]).toEqual(expect.objectContaining({
@@ -325,6 +341,119 @@ describe('app security integration', () => {
     }
   })
 
+  test('premium Link Code owners can update custom codes through the app function', async () => {
+    const securityFixture = requireFixture()
+    const code = shortCustomCode()
+    let createdId: string | undefined
+
+    try {
+      const { data: created, error: createError } = await createAdminClient()
+        .from('link_codes')
+        .insert({
+          owner_user_id: securityFixture.users.owner.id,
+          display_name: `${securityFixture.prefix} custom code through function`,
+          code: `${securityFixture.prefix}-custom-function`,
+          response_mode: 'redirect',
+          status: 'draft'
+        })
+        .select('id')
+        .single()
+      createdId = created?.id
+
+      expect(createError).toBeFalsy()
+
+      const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+        code,
+        displayName: `${securityFixture.prefix} short custom code`,
+        id: createdId,
+        responseConfig: {
+          mode: 'redirect',
+          redirectUrl: 'https://example.com/custom'
+        }
+      })
+
+      expect(error).toBeFalsy()
+      expect(data).toEqual(expect.objectContaining({
+        code,
+        displayName: `${securityFixture.prefix} short custom code`,
+        id: createdId
+      }))
+      expect(data.code).toHaveLength(6)
+
+      const { data: row, error: rowError } = await createAdminClient()
+        .from('link_codes')
+        .select('code, display_name')
+        .eq('id', createdId)
+        .single()
+
+      expect(rowError).toBeFalsy()
+      expect(row).toEqual({
+        code,
+        display_name: `${securityFixture.prefix} short custom code`
+      })
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('custom Link Code updates reject existing codes through the app function', async () => {
+    const securityFixture = requireFixture()
+    const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+      code: `${securityFixture.prefix}-hidden`,
+      displayName: `${securityFixture.prefix} duplicate custom code`,
+      id: securityFixture.linkCodes.visible,
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: 'https://example.com/visible'
+      }
+    })
+
+    expect(error).toBeTruthy()
+    expect(data).toBeFalsy()
+
+    const { data: row, error: rowError } = await createAdminClient()
+      .from('link_codes')
+      .select('code, display_name')
+      .eq('id', securityFixture.linkCodes.visible)
+      .single()
+
+    expect(rowError).toBeFalsy()
+    expect(row).toEqual({
+      code: `${securityFixture.prefix}-visible`,
+      display_name: `${securityFixture.prefix} visible Link Code`
+    })
+  })
+
+  test('non-premium Link Code owners cannot update custom codes through the app function', async () => {
+    const securityFixture = requireFixture()
+    const { data, error } = await invokeApp(outsiderClient, appRequestIdentifiers.updateLinkCodeDetails, {
+      code: shortCustomCode(),
+      displayName: `${securityFixture.prefix} non-premium custom code`,
+      id: securityFixture.linkCodes.hidden,
+      responseConfig: {
+        content: 'hidden content',
+        contentType: 'text/plain; charset=utf-8',
+        mode: 'raw_content',
+        statusCode: 200
+      }
+    })
+
+    expect(error).toBeTruthy()
+    expect(data).toBeFalsy()
+
+    const { data: row, error: rowError } = await createAdminClient()
+      .from('link_codes')
+      .select('code, display_name')
+      .eq('id', securityFixture.linkCodes.hidden)
+      .single()
+
+    expect(rowError).toBeFalsy()
+    expect(row).toEqual({
+      code: `${securityFixture.prefix}-hidden`,
+      display_name: `${securityFixture.prefix} hidden Link Code`
+    })
+  })
+
   test('Link Code updates reject invalid redirect URLs through the app function', async () => {
     const securityFixture = requireFixture()
     const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
@@ -422,6 +551,70 @@ describe('app security integration', () => {
 
     expect(error).toBeFalsy()
     expect(data?.display_name).toBe(`${securityFixture.prefix} hidden Link Code`)
+  })
+
+  test('users cannot directly read or mutate manual premium entitlements', async () => {
+    const securityFixture = requireFixture()
+    const ownerRead = await ownerClient
+      .from('manual_premium_entitlements')
+      .select('user_id')
+
+    expect(ownerRead.error || (ownerRead.data ?? []).length === 0).toBeTruthy()
+
+    const outsiderInsert = await outsiderClient
+      .from('manual_premium_entitlements')
+      .insert({
+        user_id: securityFixture.users.outsider.id
+      })
+
+    expect(outsiderInsert.error).toBeTruthy()
+
+    const ownerDelete = await ownerClient
+      .from('manual_premium_entitlements')
+      .delete()
+      .eq('user_id', securityFixture.users.owner.id)
+      .select('user_id')
+
+    expect(ownerDelete.error || (ownerDelete.data ?? []).length === 0).toBeTruthy()
+
+    const { data, error } = await createAdminClient()
+      .from('manual_premium_entitlements')
+      .select('user_id')
+      .eq('user_id', securityFixture.users.owner.id)
+      .single()
+
+    expect(error).toBeFalsy()
+    expect(data?.user_id).toBe(securityFixture.users.owner.id)
+  })
+
+  test('Link Code owners cannot directly update code strings', async () => {
+    const securityFixture = requireFixture()
+    const premiumDirectUpdate = await ownerClient
+      .from('link_codes')
+      .update({
+        code: `${securityFixture.prefix}-direct-premium`
+      })
+      .eq('id', securityFixture.linkCodes.visible)
+      .select('id')
+
+    expect(premiumDirectUpdate.error).toBeTruthy()
+
+    const nonPremiumDirectUpdate = await outsiderClient
+      .from('link_codes')
+      .update({
+        code: `${securityFixture.prefix}-direct-non-premium`
+      })
+      .eq('id', securityFixture.linkCodes.hidden)
+      .select('id')
+
+    expect(nonPremiumDirectUpdate.error).toBeTruthy()
+
+    const rows = await selectLinkCodes(createAdminClient())
+    const visibleRow = rows.find((row) => row.id === securityFixture.linkCodes.visible)
+    const hiddenRow = rows.find((row) => row.id === securityFixture.linkCodes.hidden)
+
+    expect(visibleRow?.code).toBe(`${securityFixture.prefix}-visible`)
+    expect(hiddenRow?.code).toBe(`${securityFixture.prefix}-hidden`)
   })
 
   test('anonymous users cannot directly delete Link Codes', async () => {

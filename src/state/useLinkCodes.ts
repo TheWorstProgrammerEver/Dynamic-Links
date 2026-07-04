@@ -12,6 +12,9 @@ import type { LinkCodesState, UpdateLinkCodeDetailsParams } from '../types/linkC
 import { addCreatedLinkCode, removeDeletedLinkCode, replaceUpdatedLinkCode } from './linkCodeStateUpdates'
 
 const emptyState: LinkCodesState = {
+  capabilities: {
+    canEditCustomLinkCodes: false
+  },
   linkCodes: []
 }
 
@@ -114,6 +117,7 @@ export const useLinkCodes = (currentAccount?: Account) => {
     createLinkCodeLoad,
     deleteLinkCode,
     deleteLinkCodeLoad,
+    linkCodeCapabilities: state.capabilities,
     linkCodes: state.linkCodes,
     linkCodesLoad: linkCodesLoadState,
     reloadLinkCodes,

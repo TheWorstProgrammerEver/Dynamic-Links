@@ -68,7 +68,20 @@ const createUsers = async (fixture: SecurityFixture) => {
 
 const seedFixtureRows = async (fixture: SecurityFixture) => {
   const { linkCodes, prefix, users } = fixture
-  const { error } = await createAdminClient()
+  const admin = createAdminClient()
+  const { error: entitlementError } = await admin
+    .from('manual_premium_entitlements')
+    .insert({
+      user_id: users.owner.id,
+      granted_date: today,
+      note: `${prefix} premium test fixture`
+    })
+
+  if (entitlementError) {
+    throw entitlementError
+  }
+
+  const { error } = await admin
     .from('link_codes')
     .insert([
       {
@@ -113,6 +126,7 @@ export const cleanupSecurityFixture = async (fixture?: SecurityFixture) => {
 
   const admin = createAdminClient()
 
+  await admin.from('manual_premium_entitlements').delete().eq('user_id', fixture.users.owner.id)
   await admin.from('link_codes').delete().ilike('code', `${fixture.prefix}%`)
   await Promise.all(Object.values(fixture.users)
     .filter((user) => user.id)

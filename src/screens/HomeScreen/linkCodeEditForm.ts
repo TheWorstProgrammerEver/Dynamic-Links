@@ -11,6 +11,7 @@ import type {
 } from '../../types/linkCodes'
 
 export type LinkCodeEditFormState = {
+  canEditCustomLinkCode: boolean
   code: string
   displayName: string
   id: string
@@ -22,13 +23,17 @@ export type LinkCodeEditFormState = {
   status: LinkCodeStatus
 }
 
-export type LinkCodeEditFormField = keyof Omit<LinkCodeEditFormState, 'code' | 'id' | 'status'>
+export type LinkCodeEditFormField = keyof Omit<LinkCodeEditFormState, 'canEditCustomLinkCode' | 'id' | 'status'>
 
-export const createLinkCodeEditFormState = (linkCode: LinkCodeSummary): LinkCodeEditFormState => {
+export const createLinkCodeEditFormState = (
+  linkCode: LinkCodeSummary,
+  canEditCustomLinkCode = false
+): LinkCodeEditFormState => {
   const redirectConfig = linkCode.responseConfig.mode === 'redirect' ? linkCode.responseConfig : undefined
   const rawContentConfig = linkCode.responseConfig.mode === 'raw_content' ? linkCode.responseConfig : undefined
 
   return {
+    canEditCustomLinkCode,
     code: linkCode.code,
     displayName: linkCode.displayName,
     id: linkCode.id,
@@ -62,6 +67,7 @@ export const updateLinkCodeEditFormField = (
 export const linkCodeEditFormToUpdateParams = (
   form: LinkCodeEditFormState
 ): UpdateLinkCodeDetailsParams => normalizeLinkCodeDetails({
+  ...(form.canEditCustomLinkCode ? { code: form.code } : {}),
   displayName: form.displayName,
   id: form.id,
   responseConfig: form.responseMode === 'redirect'

@@ -29,6 +29,7 @@ export const LinkCodeEditDialog = ({
   open
 }: LinkCodeEditDialogProps) => {
   const formId = useId()
+  const codeInputId = useId()
   const nameInputId = useId()
   const redirectModeId = useId()
   const rawContentModeId = useId()
@@ -66,9 +67,25 @@ export const LinkCodeEditDialog = ({
           onSubmit={onSubmit}
           noValidate
         >
-          <p className={styles.dialogMeta}>
-            <code className={styles.code}>{form.code}</code>
-          </p>
+          {form.canEditCustomLinkCode
+            ? (
+              <label htmlFor={codeInputId}>
+                Code
+                <input
+                  autoComplete="off"
+                  id={codeInputId}
+                  name="code"
+                  onChange={(event) => onChange('code', event.currentTarget.value)}
+                  type="text"
+                  value={form.code}
+                />
+              </label>
+            )
+            : (
+              <p className={styles.dialogMeta}>
+                <code className={styles.code}>{form.code}</code>
+              </p>
+            )}
 
           <label htmlFor={nameInputId}>
             Name

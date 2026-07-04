@@ -15,10 +15,15 @@ const linkCode = (id: string, displayName: string): LinkCodeSummary => ({
   status: 'draft'
 })
 
+const capabilities = {
+  canEditCustomLinkCodes: false
+}
+
 describe('Link Code state updates', () => {
   test('puts a created Link Code at the start without duplicating existing rows', () => {
     const updated = linkCode('existing', 'Updated')
     const state: LinkCodesState = {
+      capabilities,
       linkCodes: [
         linkCode('first', 'First'),
         linkCode('existing', 'Existing')
@@ -33,6 +38,7 @@ describe('Link Code state updates', () => {
 
   test('removes a deleted Link Code without reloading the whole state', () => {
     const state: LinkCodesState = {
+      capabilities,
       linkCodes: [
         linkCode('keep', 'Keep'),
         linkCode('delete', 'Delete')
@@ -47,6 +53,7 @@ describe('Link Code state updates', () => {
   test('replaces an updated Link Code in place without reloading the whole state', () => {
     const updated = linkCode('update', 'Updated')
     const state: LinkCodesState = {
+      capabilities,
       linkCodes: [
         linkCode('keep', 'Keep'),
         linkCode('update', 'Original')
