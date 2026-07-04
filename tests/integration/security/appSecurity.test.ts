@@ -191,6 +191,64 @@ describe('app security integration', () => {
     }
   })
 
+  test('Link Code owners can delete their own rows through the app function', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      const { data: created, error: createError } = await createAdminClient()
+        .from('link_codes')
+        .insert({
+          owner_user_id: securityFixture.users.owner.id,
+          display_name: `${securityFixture.prefix} delete through function`,
+          code: `${securityFixture.prefix}-delete-function`,
+          response_mode: 'redirect',
+          status: 'draft'
+        })
+        .select('id')
+        .single()
+      createdId = created?.id
+
+      expect(createError).toBeFalsy()
+
+      const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.deleteLinkCode, {
+        id: createdId
+      })
+
+      expect(error).toBeFalsy()
+      expect(data).toEqual({ id: createdId })
+
+      const { data: rows, error: selectError } = await createAdminClient()
+        .from('link_codes')
+        .select('id')
+        .eq('id', createdId)
+
+      expect(selectError).toBeFalsy()
+      expect(rows ?? []).toHaveLength(0)
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('Link Code owners cannot delete another owner row through the app function', async () => {
+    const securityFixture = requireFixture()
+    const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.deleteLinkCode, {
+      id: securityFixture.linkCodes.hidden
+    })
+
+    expect(error).toBeTruthy()
+    expect(data).toBeFalsy()
+
+    const { data: row, error: rowError } = await createAdminClient()
+      .from('link_codes')
+      .select('display_name')
+      .eq('id', securityFixture.linkCodes.hidden)
+      .single()
+
+    expect(rowError).toBeFalsy()
+    expect(row?.display_name).toBe(`${securityFixture.prefix} hidden Link Code`)
+  })
+
   test('Link Code owners only read their own rows directly', async () => {
     const securityFixture = requireFixture()
     const ownerRows = await selectLinkCodes(ownerClient)
@@ -241,6 +299,26 @@ describe('app security integration', () => {
 
     expect(error).toBeFalsy()
     expect(data?.display_name).toBe(`${securityFixture.prefix} hidden Link Code`)
+  })
+
+  test('anonymous users cannot directly delete Link Codes', async () => {
+    const securityFixture = requireFixture()
+    const deleted = await anonymousClient
+      .from('link_codes')
+      .delete()
+      .eq('id', securityFixture.linkCodes.visible)
+      .select('id')
+
+    expect(deleted.data ?? []).toHaveLength(0)
+
+    const { data, error } = await createAdminClient()
+      .from('link_codes')
+      .select('display_name')
+      .eq('id', securityFixture.linkCodes.visible)
+      .single()
+
+    expect(error).toBeFalsy()
+    expect(data?.display_name).toBe(`${securityFixture.prefix} visible Link Code`)
   })
 
   test('Link Code owners can directly write their own rows', async () => {

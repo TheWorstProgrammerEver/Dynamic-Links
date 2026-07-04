@@ -65,3 +65,12 @@
   color: var(--color-negative);
   font-weight: 800;
 }
+
+.deleteConfirmation {
+  display: grid;
+  gap: 0.75rem;
+
+  p {
+    margin: 0;
+  }
+}

@@ -1,10 +1,13 @@
 import { useId } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
+import { AppDialog, DialogFooterActions } from '../../../lib/ui/AppDialog/AppDialog'
 import { AsynchronousSubmitButton } from '../../../lib/ui/AsynchronousSubmitButton/AsynchronousSubmitButton'
+import { Button } from '../../../lib/ui/Button/Button'
 import { ComponentRoleContext } from '../../../lib/ui/ComponentRoleContext/ComponentRoleContext'
 import { FormGrid } from '../../../lib/ui/FormGrid/FormGrid'
 import { List, ListItem } from '../../../lib/ui/List/List'
 import { LoaderContainer } from '../../../lib/ui/LoaderContainer/LoaderContainer'
+import { ResponsiveButton } from '../../../lib/ui/ResponsiveButton/ResponsiveButton'
 import { Section } from '../../../lib/ui/Section/Section'
 import styles from './HomeScreen.module.scss'
 import { useHomeScreenViewModel } from './useHomeScreenViewModel'
@@ -13,7 +16,9 @@ export const HomeScreen = () => {
   const viewModel = useHomeScreenViewModel()
   const nameInputId = useId()
   const nameErrorId = useId()
+  const deleteFormId = useId()
   const createForm = viewModel.createLinkCodeForm
+  const deleteConfirmation = viewModel.deleteLinkCodeConfirmation
 
   return (
     <section className={styles.screen} aria-labelledby="home-title">
@@ -62,6 +67,19 @@ export const HomeScreen = () => {
               {viewModel.linkCodes.map((linkCode) => (
                 <ListItem
                   key={linkCode.id}
+                  actions={(
+                    <ComponentRoleContext role="destructive">
+                      <ResponsiveButton
+                        type="button"
+                        icon={<Trash2 />}
+                        label={`Delete ${linkCode.displayName}`}
+                        onClick={() => deleteConfirmation.request(linkCode)}
+                      >
+                        Delete
+                      </ResponsiveButton>
+                    </ComponentRoleContext>
+                  )}
+                  actionsLabel={`${linkCode.displayName} actions`}
                   details={(
                     <>
                       <strong>{linkCode.displayName}</strong>
@@ -82,6 +100,49 @@ export const HomeScreen = () => {
           )}
         </LoaderContainer>
       </Section>
+
+      <AppDialog
+        open={deleteConfirmation.open}
+        title="Delete Link Code"
+        onClose={deleteConfirmation.cancel}
+        footer={(
+          <DialogFooterActions>
+            <ComponentRoleContext role="destructive">
+              <AsynchronousSubmitButton
+                form={deleteFormId}
+                loader={deleteConfirmation.loader}
+                statusLabel="Deleting Link Code..."
+              >
+                <Trash2 aria-hidden="true" />
+                Delete Link Code
+              </AsynchronousSubmitButton>
+            </ComponentRoleContext>
+            <ComponentRoleContext role="secondary">
+              <Button
+                type="button"
+                disabled={deleteConfirmation.loader.busy}
+                onClick={deleteConfirmation.cancel}
+              >
+                Cancel
+              </Button>
+            </ComponentRoleContext>
+          </DialogFooterActions>
+        )}
+      >
+        <form id={deleteFormId} className={styles.deleteConfirmation} onSubmit={deleteConfirmation.confirm}>
+          <p>
+            This permanently removes <strong>{deleteConfirmation.target?.displayName}</strong>.
+          </p>
+          {deleteConfirmation.target && (
+            <p>
+              Code <code className={styles.code}>{deleteConfirmation.target.code}</code> will stop appearing in your Link Codes.
+            </p>
+          )}
+          {deleteConfirmation.error && (
+            <p className={styles.error} role="alert">{deleteConfirmation.error}</p>
+          )}
+        </form>
+      </AppDialog>
     </section>
   )
 }
