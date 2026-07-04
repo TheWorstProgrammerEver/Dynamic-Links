@@ -3,7 +3,8 @@ import { LinkCodeCodeValidationError, normalizeLinkCodeCode } from './linkCodeCo
 export const defaultRawContentType = 'text/plain; charset=utf-8'
 export const defaultRawStatusCode = 200
 export const maximumHttpStatusCode = 599
-export const minimumHttpStatusCode = 100
+export const minimumHttpStatusCode = 200
+const bodylessRawStatusCodes = new Set([204, 205, 304])
 
 type RedirectResponseConfig = {
   mode: 'redirect'
@@ -63,7 +64,7 @@ export const normalizeRedirectUrl = (redirectUrl: string) => {
   return parsedUrl.href
 }
 
-const normalizeRawContentType = (contentType: string) => {
+export const normalizeRawContentType = (contentType: string) => {
   const normalizedContentType = contentType.trim() || defaultRawContentType
 
   if (/[\r\n]/.test(normalizedContentType)) {
@@ -73,13 +74,14 @@ const normalizeRawContentType = (contentType: string) => {
   return normalizedContentType
 }
 
-const normalizeRawStatusCode = (statusCode: number) => {
+export const normalizeRawStatusCode = (statusCode: number) => {
   if (
     !Number.isInteger(statusCode)
     || statusCode < minimumHttpStatusCode
     || statusCode > maximumHttpStatusCode
+    || bodylessRawStatusCodes.has(statusCode)
   ) {
-    throw validationError('Status code must be an integer from 100 to 599.')
+    throw validationError('Status code must be an integer from 200 to 599 that allows a response body.')
   }
 
   return statusCode

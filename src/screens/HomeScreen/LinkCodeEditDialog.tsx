@@ -146,7 +146,7 @@ export const LinkCodeEditDialog = ({
                   id={rawStatusCodeId}
                   inputMode="numeric"
                   max="599"
-                  min="100"
+                  min="200"
                   name="rawStatusCode"
                   onChange={(event) => onChange('rawStatusCode', event.currentTarget.value)}
                   type="number"
