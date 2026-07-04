@@ -33,3 +33,11 @@ Prefer smaller, focused commits that are easier to digest.
 When handing over for testing, make sure the app is runnable at all times via a LAN network address (not just the client-side but also the backend, presumably supabase).
 
 Use the supabase-react-ts skill and Friendly-Ledger as reference projects.
+
+Other guidance:
+  - Preferred workflow: use issue branches and PRs for all code-changing issues.
+  - Definition of done: PR URL in Linear comment, validation commands run, app left runnable over LAN, issue moved to the configured final status.
+  - Stack contract: Vite React TS, Supabase Auth/Postgres/Edge Functions, RLS, SCSS modules, get-going/all-done.
+  - Security contract: public resolver must not weaken RLS; anonymous direct table access stays denied.
+  - Scope exclusions: no billing, teams, rich editor, custom QR styling, or extra product surface unless a later issue asks for it.
+  - Repo pointer: explicit GitHub URL and expected local clone path/discovery instruction.
