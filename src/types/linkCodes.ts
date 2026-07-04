@@ -8,5 +8,6 @@ export type {
   LinkCodeStatus,
   LinkCodeSummary,
   LinkCodesState,
+  PublicLinkCodeLookup,
   UpdateLinkCodeDetailsParams
 } from '../../common/linkCodeTypes'

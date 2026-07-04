@@ -10,6 +10,9 @@
       "magicLink": #{AUTH_MAGIC_LINK_ENABLED}#
     }
   },
+  "publicLinks": {
+    "host": "#{PUBLIC_LINK_HOST}#"
+  },
   "supabase": {
     "url": "#{SUPABASE_URL}#",
     "publishableKey": "#{SUPABASE_PUBLISHABLE_KEY}#"

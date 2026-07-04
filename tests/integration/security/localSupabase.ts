@@ -120,11 +120,19 @@ export const createSignedInClient = async (email: string, password: string) => {
 
 export const requireLocalFunctionsReady = async () => {
   const { url } = getLocalSupabaseConfig()
-  const response = await fetch(`${url}/functions/v1/app-health`, {
+  const healthResponse = await fetch(`${url}/functions/v1/app-health`, {
     signal: AbortSignal.timeout(3000)
   }).catch(() => undefined)
 
-  if (!response?.ok) {
+  if (!healthResponse?.ok) {
     throw new Error('Security integration tests need local Edge Functions running. Run npm run get-going first.')
+  }
+
+  const publicResolverResponse = await fetch(`${url}/functions/v1/public-link-code/__missing__`, {
+    signal: AbortSignal.timeout(3000)
+  }).catch(() => undefined)
+
+  if (publicResolverResponse?.status !== 404) {
+    throw new Error('Security integration tests need the public Link Code function mounted. Restart npm run get-going.')
   }
 }

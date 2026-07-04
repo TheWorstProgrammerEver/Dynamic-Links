@@ -13,6 +13,9 @@ interface Window {
     }
     buildVersion?: string
     environment?: string
+    publicLinks?: {
+      host?: string
+    }
     supabase?: {
       url?: string
       publishableKey?: string

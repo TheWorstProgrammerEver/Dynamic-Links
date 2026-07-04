@@ -1,9 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { appRequestIdentifiers, appRequestNames } from '../../../common/appRequestIdentifiers'
+import { createPublicLinkCodePath } from '../../../common/linkCodePublicUrls'
 import {
   createAdminClient,
   createAnonymousClient,
+  getLocalSupabaseConfig,
   createSignedInClient,
   requireLocalFunctionsReady
 } from './localSupabase'
@@ -74,6 +76,12 @@ const deleteLinkCode = async (id?: string) => {
     .eq('id', id)
 }
 
+const fetchPublicLinkCode = async (code: string) => {
+  const { url } = getLocalSupabaseConfig()
+
+  return await fetch(`${url}/functions/v1/public-link-code/${encodeURIComponent(code)}`)
+}
+
 beforeAll(async () => {
   await requireLocalFunctionsReady()
   fixture = await createSecurityFixture()
@@ -103,6 +111,68 @@ describe('app security integration', () => {
       .limit(10)
 
     expect(data ?? []).toHaveLength(0)
+  })
+
+  test('public Link Code paths use the canonical code route', () => {
+    const securityFixture = requireFixture()
+
+    expect(createPublicLinkCodePath(`${securityFixture.prefix}-visible`))
+      .toBe(`/code/${encodeURIComponent(`${securityFixture.prefix}-visible`)}`)
+  })
+
+  test('anonymous users can resolve configured Link Codes through the public function', async () => {
+    const securityFixture = requireFixture()
+    const response = await fetchPublicLinkCode(`${securityFixture.prefix}-visible`)
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body).toEqual({
+      code: `${securityFixture.prefix}-visible`,
+      responseMode: 'redirect'
+    })
+    expect(JSON.stringify(body)).not.toContain(securityFixture.users.owner.id)
+    expect(JSON.stringify(body)).not.toContain(`${securityFixture.prefix} visible Link Code`)
+  })
+
+  test('unknown Link Codes return a safe public 404', async () => {
+    const securityFixture = requireFixture()
+    const response = await fetchPublicLinkCode(`${securityFixture.prefix}-missing`)
+    const body = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(body).toEqual({ error: 'Link Code not found.' })
+  })
+
+  test('unconfigured Link Codes return a safe public 404', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      const { data: created, error: createError } = await createAdminClient()
+        .from('link_codes')
+        .insert({
+          owner_user_id: securityFixture.users.owner.id,
+          display_name: `${securityFixture.prefix} unconfigured public Link Code`,
+          code: `${securityFixture.prefix}-unconfigured`,
+          response_mode: 'redirect',
+          status: 'active'
+        })
+        .select('id')
+        .single()
+      createdId = created?.id
+
+      expect(createError).toBeFalsy()
+
+      const response = await fetchPublicLinkCode(`${securityFixture.prefix}-unconfigured`)
+      const body = await response.json()
+
+      expect(response.status).toBe(404)
+      expect(body).toEqual({ error: 'Link Code not found.' })
+      expect(JSON.stringify(body)).not.toContain(securityFixture.users.owner.id)
+      expect(JSON.stringify(body)).not.toContain('unconfigured public Link Code')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
   })
 
   test('anonymous users cannot directly create Link Codes', async () => {

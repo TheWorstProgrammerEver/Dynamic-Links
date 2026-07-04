@@ -1,1 +1,2 @@
+/code/* #{SUPABASE_URL}#/functions/v1/public-link-code/:splat 200
 /* /index.html 200

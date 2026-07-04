@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Copy, Pencil, Plus, Trash2 } from 'lucide-react'
 import { AppDialog, DialogFooterActions } from '../../../lib/ui/AppDialog/AppDialog'
 import { AsynchronousSubmitButton } from '../../../lib/ui/AsynchronousSubmitButton/AsynchronousSubmitButton'
 import { Button } from '../../../lib/ui/Button/Button'
@@ -65,49 +65,76 @@ export const HomeScreen = () => {
 
           {viewModel.linkCodes.length > 0 && (
             <List ariaLabel="Owned Link Codes">
-              {viewModel.linkCodes.map((linkCode) => (
-                <ListItem
-                  key={linkCode.id}
-                  actions={(
-                    <>
-                      <ComponentRoleContext role="secondary">
-                        <ResponsiveButton
-                          icon={<Pencil />}
-                          label={`Edit ${linkCode.displayName}`}
-                          type="button"
-                          onClick={() => viewModel.openEditLinkCode(linkCode)}
-                        >
-                          Edit
-                        </ResponsiveButton>
-                      </ComponentRoleContext>
+              {viewModel.linkCodes.map((linkCode) => {
+                const publicUrl = viewModel.publicUrlForLinkCode(linkCode)
+                const copied = viewModel.publicUrlCopyStatus.copiedLinkCodeId === linkCode.id
 
-                      <ComponentRoleContext role="destructive">
-                        <ResponsiveButton
-                          type="button"
-                          icon={<Trash2 />}
-                          label={`Delete ${linkCode.displayName}`}
-                          onClick={() => deleteConfirmation.request(linkCode)}
-                        >
-                          Delete
-                        </ResponsiveButton>
-                      </ComponentRoleContext>
-                    </>
-                  )}
-                  actionsLabel={`${linkCode.displayName} actions`}
-                  details={(
-                    <>
-                      <strong>{linkCode.displayName}</strong>
-                      <code className={styles.code}>{linkCode.code}</code>
-                      <span className={styles.meta}>
-                        <span>{viewModel.responseModeLabels[linkCode.responseMode]}</span>
-                        <span>{viewModel.formatResponseConfig(linkCode)}</span>
-                        <span>{viewModel.statusLabels[linkCode.status]}</span>
-                      </span>
-                    </>
-                  )}
-                />
-              ))}
+                return (
+                  <ListItem
+                    key={linkCode.id}
+                    actions={(
+                      <>
+                        <ComponentRoleContext role="secondary">
+                          <ResponsiveButton
+                            icon={<Copy />}
+                            label={`Copy public URL for ${linkCode.displayName}`}
+                            type="button"
+                            onClick={() => void viewModel.copyPublicUrl(linkCode)}
+                          >
+                            {copied ? 'Copied' : 'Copy URL'}
+                          </ResponsiveButton>
+                        </ComponentRoleContext>
+
+                        <ComponentRoleContext role="secondary">
+                          <ResponsiveButton
+                            icon={<Pencil />}
+                            label={`Edit ${linkCode.displayName}`}
+                            type="button"
+                            onClick={() => viewModel.openEditLinkCode(linkCode)}
+                          >
+                            Edit
+                          </ResponsiveButton>
+                        </ComponentRoleContext>
+
+                        <ComponentRoleContext role="destructive">
+                          <ResponsiveButton
+                            type="button"
+                            icon={<Trash2 />}
+                            label={`Delete ${linkCode.displayName}`}
+                            onClick={() => deleteConfirmation.request(linkCode)}
+                          >
+                            Delete
+                          </ResponsiveButton>
+                        </ComponentRoleContext>
+                      </>
+                    )}
+                    actionsLabel={`${linkCode.displayName} actions`}
+                    details={(
+                      <>
+                        <strong>{linkCode.displayName}</strong>
+                        <code className={styles.code}>{linkCode.code}</code>
+                        <a className={styles.publicUrl} href={publicUrl} target="_blank" rel="noreferrer">
+                          {publicUrl}
+                        </a>
+                        <span className={styles.meta}>
+                          <span>{viewModel.responseModeLabels[linkCode.responseMode]}</span>
+                          <span>{viewModel.formatResponseConfig(linkCode)}</span>
+                          <span>{viewModel.statusLabels[linkCode.status]}</span>
+                        </span>
+                      </>
+                    )}
+                  />
+                )
+              })}
             </List>
+          )}
+
+          {viewModel.publicUrlCopyStatus.error && (
+            <p className={styles.error} role="alert">{viewModel.publicUrlCopyStatus.error}</p>
+          )}
+
+          {viewModel.publicUrlCopyStatus.copiedLinkCodeId && !viewModel.publicUrlCopyStatus.error && (
+            <p className={styles.status} role="status">Public URL copied.</p>
           )}
 
           {viewModel.linkCodes.length === 0 && viewModel.linkCodesLoad.settled && !viewModel.linkCodesLoad.error && (

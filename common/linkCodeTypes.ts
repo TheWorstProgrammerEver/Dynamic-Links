@@ -30,6 +30,11 @@ export type LinkCodesState = {
   linkCodes: LinkCodeSummary[]
 }
 
+export type PublicLinkCodeLookup = {
+  code: string
+  responseMode: LinkCodeResponseMode
+}
+
 export type CreateLinkCodeParams = {
   displayName: string
 }
