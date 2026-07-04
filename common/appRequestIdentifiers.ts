@@ -1,5 +1,6 @@
 export const appRequestIdentifiers = {
   createLinkCode: 'createLinkCode',
+  deleteLinkCode: 'deleteLinkCode',
   loadLinkCodes: 'loadLinkCodes'
 } as const
 

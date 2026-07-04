@@ -91,7 +91,8 @@ test('creates an account, signs out, and signs back in', async ({ page }) => {
 
   await page.getByLabel('Name', { exact: true }).fill('Launch page')
   await page.getByRole('button', { name: 'Create Link Code' }).click()
-  await expect(page.getByText('Launch page')).toBeVisible()
+  const launchPageRow = page.getByRole('listitem').filter({ hasText: 'Launch page' })
+  await expect(launchPageRow).toBeVisible()
   await expect(page.locator('code').filter({ hasText: /^[23456789abcdefghijkmnpqrstuvwxyz]{8,}$/ })).toBeVisible()
   await expect(page.getByText('No Link Codes yet')).not.toBeVisible()
 
@@ -110,5 +111,31 @@ test('creates an account, signs out, and signs back in', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Home' }).click()
-  await expect(page.getByText('Launch page')).toBeVisible()
+  await expect(launchPageRow).toBeVisible()
+})
+
+test('deletes a Link Code only after confirmation', async ({ page }) => {
+  await createAccount(page)
+
+  await expect(page).toHaveURL('/')
+  await page.getByLabel('Name', { exact: true }).fill('Temporary launch')
+  await page.getByRole('button', { name: 'Create Link Code' }).click()
+
+  const linkCodeRow = page.getByRole('listitem').filter({ hasText: 'Temporary launch' })
+  await expect(linkCodeRow).toBeVisible()
+
+  await linkCodeRow.getByRole('button', { name: 'Delete Temporary launch' }).click()
+  const confirmationDialog = page.getByRole('dialog', { name: 'Delete Link Code' })
+  await expect(confirmationDialog).toBeVisible()
+
+  await confirmationDialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(confirmationDialog).not.toBeVisible()
+  await expect(linkCodeRow).toBeVisible()
+
+  await linkCodeRow.getByRole('button', { name: 'Delete Temporary launch' }).click()
+  await confirmationDialog.getByRole('button', { name: 'Delete Link Code' }).click()
+
+  await expect(confirmationDialog).not.toBeVisible()
+  await expect(page.getByText('Temporary launch')).not.toBeVisible()
+  await expect(page.getByText('No Link Codes yet')).toBeVisible()
 })

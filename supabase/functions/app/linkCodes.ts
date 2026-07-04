@@ -1,5 +1,5 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import type { CreateLinkCodeParams } from '../../../common/linkCodeTypes.ts'
+import type { CreateLinkCodeParams, DeleteLinkCodeParams } from '../../../common/linkCodeTypes.ts'
 import {
   createLinkCodeWithRandomCode,
   LinkCodeCollisionError,
@@ -87,4 +87,28 @@ export const createOwnedLinkCode = async (
 
     throw error
   }
+}
+
+export const deleteOwnedLinkCode = async (
+  client: SupabaseClient,
+  ownerUserId: string,
+  { id }: DeleteLinkCodeParams
+) => {
+  const { data, error } = await client
+    .from('link_codes')
+    .delete()
+    .eq('id', id)
+    .eq('owner_user_id', ownerUserId)
+    .select('id')
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  if (!data) {
+    throw new HttpError(404, 'Link Code not found.')
+  }
+
+  return { id: data.id as string }
 }

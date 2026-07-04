@@ -18,3 +18,11 @@ export type LinkCodesState = {
 export type CreateLinkCodeParams = {
   displayName: string
 }
+
+export type DeleteLinkCodeParams = {
+  id: string
+}
+
+export type DeletedLinkCode = {
+  id: string
+}
