@@ -132,7 +132,12 @@ export const requireLocalFunctionsReady = async () => {
     signal: AbortSignal.timeout(3000)
   }).catch(() => undefined)
 
-  if (publicResolverResponse?.status !== 404) {
+  const publicResolverBody = await publicResolverResponse?.text()
+
+  if (
+    publicResolverResponse?.status !== 404
+    || publicResolverBody !== '{"error":"Link Code not found."}'
+  ) {
     throw new Error('Security integration tests need the public Link Code function mounted. Restart npm run get-going.')
   }
 }

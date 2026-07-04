@@ -79,10 +79,56 @@ const deleteLinkCode = async (id?: string) => {
     .eq('id', id)
 }
 
+const insertLinkCode = async ({
+  code,
+  displayName,
+  ownerUserId,
+  rawContent = null,
+  redirectUrl = null,
+  responseMode = 'redirect',
+  status = 'active'
+}: {
+  code: string
+  displayName: string
+  ownerUserId: string
+  rawContent?: string | null
+  redirectUrl?: string | null
+  responseMode?: string
+  status?: string
+}) => {
+  const { data, error } = await createAdminClient()
+    .from('link_codes')
+    .insert({
+      owner_user_id: ownerUserId,
+      display_name: displayName,
+      code,
+      raw_content: rawContent,
+      raw_content_type: 'text/plain; charset=utf-8',
+      raw_status_code: 200,
+      redirect_url: redirectUrl,
+      response_mode: responseMode,
+      status
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  if (!data) {
+    throw new Error('Link Code fixture row was not created.')
+  }
+
+  return data.id as string
+}
+
 const fetchPublicLinkCode = async (code: string) => {
   const { url } = getLocalSupabaseConfig()
 
-  return await fetch(`${url}/functions/v1/public-link-code/${encodeURIComponent(code)}`)
+  return await fetch(`${url}/functions/v1/public-link-code/${encodeURIComponent(code)}`, {
+    redirect: 'manual'
+  })
 }
 
 beforeAll(async () => {
@@ -130,18 +176,18 @@ describe('app security integration', () => {
       .toBe(`/code/${encodeURIComponent(`${securityFixture.prefix}-visible`)}`)
   })
 
-  test('anonymous users can resolve configured Link Codes through the public function', async () => {
+  test('anonymous users are redirected by configured redirect Link Codes through the public function', async () => {
     const securityFixture = requireFixture()
     const response = await fetchPublicLinkCode(`${securityFixture.prefix}-visible`)
-    const body = await response.json()
+    const body = await response.text()
 
-    expect(response.status).toBe(200)
-    expect(body).toEqual({
-      code: `${securityFixture.prefix}-visible`,
-      responseMode: 'redirect'
-    })
-    expect(JSON.stringify(body)).not.toContain(securityFixture.users.owner.id)
-    expect(JSON.stringify(body)).not.toContain(`${securityFixture.prefix} visible Link Code`)
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('https://example.com/visible')
+    expect(response.headers.get('cache-control')).toContain('no-store')
+    expect(body).toBe('')
+    expect(`${response.headers.get('location') ?? ''}${body}`).not.toContain(securityFixture.users.owner.id)
+    expect(`${response.headers.get('location') ?? ''}${body}`)
+      .not.toContain(`${securityFixture.prefix} visible Link Code`)
   })
 
   test('unknown Link Codes return a safe public 404', async () => {
@@ -150,6 +196,7 @@ describe('app security integration', () => {
     const body = await response.json()
 
     expect(response.status).toBe(404)
+    expect(response.headers.get('location')).toBeNull()
     expect(body).toEqual({ error: 'Link Code not found.' })
   })
 
@@ -158,28 +205,148 @@ describe('app security integration', () => {
     let createdId: string | undefined
 
     try {
-      const { data: created, error: createError } = await createAdminClient()
-        .from('link_codes')
-        .insert({
-          owner_user_id: securityFixture.users.owner.id,
-          display_name: `${securityFixture.prefix} unconfigured public Link Code`,
-          code: `${securityFixture.prefix}-unconfigured`,
-          response_mode: 'redirect',
-          status: 'active'
-        })
-        .select('id')
-        .single()
-      createdId = created?.id
-
-      expect(createError).toBeFalsy()
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} unconfigured public Link Code`,
+        code: `${securityFixture.prefix}-unconfigured`
+      })
 
       const response = await fetchPublicLinkCode(`${securityFixture.prefix}-unconfigured`)
       const body = await response.json()
 
       expect(response.status).toBe(404)
+      expect(response.headers.get('location')).toBeNull()
       expect(body).toEqual({ error: 'Link Code not found.' })
       expect(JSON.stringify(body)).not.toContain(securityFixture.users.owner.id)
       expect(JSON.stringify(body)).not.toContain('unconfigured public Link Code')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('configured content-mode Link Codes do not redirect through the public function', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} public content Link Code`,
+        code: `${securityFixture.prefix}-content`,
+        rawContent: 'public content',
+        responseMode: 'raw_content'
+      })
+
+      const response = await fetchPublicLinkCode(`${securityFixture.prefix}-content`)
+      const body = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('location')).toBeNull()
+      expect(body).toEqual({
+        code: `${securityFixture.prefix}-content`,
+        responseMode: 'raw_content'
+      })
+      expect(JSON.stringify(body)).not.toContain(securityFixture.users.owner.id)
+      expect(JSON.stringify(body)).not.toContain('public content Link Code')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('deleted Link Codes return a safe public 404 without redirecting', async () => {
+    const securityFixture = requireFixture()
+    const code = `${securityFixture.prefix}-deleted`
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} deleted public Link Code`,
+        code,
+        redirectUrl: 'https://example.com/deleted'
+      })
+      await deleteLinkCode(createdId)
+      createdId = undefined
+
+      const response = await fetchPublicLinkCode(code)
+      const body = await response.json()
+
+      expect(response.status).toBe(404)
+      expect(response.headers.get('location')).toBeNull()
+      expect(body).toEqual({ error: 'Link Code not found.' })
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('invalid stored redirect URLs return a safe public 404 without redirecting', async () => {
+    const securityFixture = requireFixture()
+    const code = `${securityFixture.prefix}-invalid-redirect`
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} invalid redirect public Link Code`,
+        code,
+        redirectUrl: 'http://'
+      })
+
+      const response = await fetchPublicLinkCode(code)
+      const body = await response.json()
+
+      expect(response.status).toBe(404)
+      expect(response.headers.get('location')).toBeNull()
+      expect(body).toEqual({ error: 'Link Code not found.' })
+      expect(JSON.stringify(body)).not.toContain(securityFixture.users.owner.id)
+      expect(JSON.stringify(body)).not.toContain('invalid redirect public Link Code')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('updated redirect URLs change public resolution without changing the public path', async () => {
+    const securityFixture = requireFixture()
+    const code = `${securityFixture.prefix}-mutable-redirect`
+    const publicPath = createPublicLinkCodePath(code)
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} mutable redirect Link Code`,
+        code,
+        redirectUrl: 'https://example.com/first'
+      })
+
+      const firstResponse = await fetchPublicLinkCode(code)
+
+      expect(firstResponse.status).toBe(302)
+      expect(firstResponse.headers.get('location')).toBe('https://example.com/first')
+
+      const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+        displayName: `${securityFixture.prefix} mutable redirect Link Code`,
+        id: createdId,
+        responseConfig: {
+          mode: 'redirect',
+          redirectUrl: ' https://example.com/second?source=update '
+        }
+      })
+
+      expect(error).toBeFalsy()
+      expect(data).toEqual(expect.objectContaining({
+        code,
+        responseConfig: {
+          mode: 'redirect',
+          redirectUrl: 'https://example.com/second?source=update'
+        }
+      }))
+      expect(createPublicLinkCodePath(code)).toBe(publicPath)
+
+      const secondResponse = await fetchPublicLinkCode(code)
+
+      expect(secondResponse.status).toBe(302)
+      expect(secondResponse.headers.get('location')).toBe('https://example.com/second?source=update')
     } finally {
       await deleteLinkCode(createdId)
     }
@@ -537,6 +704,40 @@ describe('app security integration', () => {
 
     expect(error).toBeTruthy()
     expect(data).toBeFalsy()
+  })
+
+  test('Link Code owners cannot directly store unsafe redirect URLs', async () => {
+    const securityFixture = requireFixture()
+    const unsafeProtocolUpdate = await ownerClient
+      .from('link_codes')
+      .update({
+        redirect_url: 'javascript:alert(1)',
+        response_mode: 'redirect'
+      })
+      .eq('id', securityFixture.linkCodes.visible)
+      .select('id')
+
+    expect(unsafeProtocolUpdate.error).toBeTruthy()
+
+    const lineBreakUpdate = await ownerClient
+      .from('link_codes')
+      .update({
+        redirect_url: 'https://example.com/\r\nx-extra: value',
+        response_mode: 'redirect'
+      })
+      .eq('id', securityFixture.linkCodes.visible)
+      .select('id')
+
+    expect(lineBreakUpdate.error).toBeTruthy()
+
+    const { data: row, error: rowError } = await createAdminClient()
+      .from('link_codes')
+      .select('redirect_url')
+      .eq('id', securityFixture.linkCodes.visible)
+      .single()
+
+    expect(rowError).toBeFalsy()
+    expect(row?.redirect_url).toBe('https://example.com/visible')
   })
 
   test('Link Code owners cannot update another owner row through the app function', async () => {
