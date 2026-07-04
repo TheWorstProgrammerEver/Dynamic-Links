@@ -92,6 +92,7 @@ const writeLocalConfig = (lanAddress) => {
     ? 'Refreshing public/config.local.json for this machine...'
     : 'No public/config.local.json found; generating one for this machine...')
 
+  const appHost = lanAddress ?? 'localhost'
   const configTemplate = readFileSync('public/config.json', 'utf8')
   const config = JSON.parse(
     configTemplate
@@ -101,6 +102,7 @@ const writeLocalConfig = (lanAddress) => {
       .replaceAll('#{AUTH_PASSKEY_ENABLED}#', 'true')
       .replaceAll('#{AUTH_OTP_ENABLED}#', 'true')
       .replaceAll('#{AUTH_MAGIC_LINK_ENABLED}#', 'true')
+      .replaceAll('"#{PUBLIC_LINK_HOST}#"', `"http://${appHost}:${appPort}"`)
       .replaceAll('"#{SUPABASE_URL}#"', '"http://127.0.0.1:54321"')
       .replaceAll('"#{SUPABASE_PUBLISHABLE_KEY}#"', '"sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"')
   )
@@ -110,6 +112,10 @@ const writeLocalConfig = (lanAddress) => {
     ...config,
     buildVersion: 'dev',
     environment: 'local',
+    publicLinks: {
+      ...config.publicLinks,
+      host: `http://${appHost}:${appPort}`
+    },
     supabase: {
       ...config.supabase,
       url: `http://${supabaseHost}:${supabasePort}`

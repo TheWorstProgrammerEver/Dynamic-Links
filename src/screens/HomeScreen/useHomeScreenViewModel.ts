@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { LinkCodeDetailsValidationError } from '../../../common/linkCodeDetails'
+import { createPublicLinkCodeUrl } from '../../../common/linkCodePublicUrls'
 import { useAuthContext } from '../../contexts/AuthContext'
+import { getPublicLinkHost } from '../../data/publicLinks'
 import { useLinkCodes } from '../../state/useLinkCodes'
 import type {
   LinkCodeResponseMode,
@@ -42,6 +44,11 @@ export const useHomeScreenViewModel = () => {
   const [deleteConfirmation, setDeleteConfirmation] = useState(closedLinkCodeDeleteConfirmationState)
   const [editForm, setEditForm] = useState<LinkCodeEditFormState>()
   const [editValidationError, setEditValidationError] = useState<string>()
+  const [publicUrlCopy, setPublicUrlCopy] = useState<{
+    copiedLinkCodeId?: string
+    error?: string
+  }>({})
+  const publicLinkHost = useMemo(getPublicLinkHost, [])
   const clearCreateError = linkCodes.createLinkCodeLoad.clearError
   const clearDeleteError = linkCodes.deleteLinkCodeLoad.clearError
   const clearEditError = linkCodes.updateLinkCodeLoad.clearError
@@ -154,8 +161,28 @@ export const useHomeScreenViewModel = () => {
     }
   }, [editForm, linkCodes.updateLinkCodeDetails])
 
+  const publicUrlForLinkCode = useCallback((linkCode: LinkCodeSummary) => (
+    createPublicLinkCodeUrl(publicLinkHost, linkCode.code)
+  ), [publicLinkHost])
+
+  const copyPublicUrl = useCallback(async (linkCode: LinkCodeSummary) => {
+    setPublicUrlCopy({})
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API is unavailable.')
+      }
+
+      await navigator.clipboard.writeText(publicUrlForLinkCode(linkCode))
+      setPublicUrlCopy({ copiedLinkCodeId: linkCode.id })
+    } catch {
+      setPublicUrlCopy({ error: 'Could not copy the public URL.' })
+    }
+  }, [publicUrlForLinkCode])
+
   return useMemo(() => ({
     accountEmail: currentAccount?.email,
+    copyPublicUrl,
     createLinkCodeForm: {
       error: nameValidationError ?? linkCodes.createLinkCodeLoad.error,
       loader: linkCodes.createLinkCodeLoad,
@@ -185,12 +212,15 @@ export const useHomeScreenViewModel = () => {
     linkCodes: linkCodes.linkCodes,
     linkCodesLoad: linkCodes.linkCodesLoad,
     openEditLinkCode,
+    publicUrlCopyStatus: publicUrlCopy,
+    publicUrlForLinkCode,
     responseModeLabels,
     statusLabels
   }), [
     cancelDeleteLinkCode,
     closeEditLinkCode,
     confirmDeleteLinkCode,
+    copyPublicUrl,
     currentAccount?.email,
     deleteConfirmation,
     editForm,
@@ -203,6 +233,8 @@ export const useHomeScreenViewModel = () => {
     nameValidationError,
     newLinkCodeName,
     openEditLinkCode,
+    publicUrlCopy,
+    publicUrlForLinkCode,
     requestDeleteLinkCode,
     submitEditLinkCode,
     submitNewLinkCode,

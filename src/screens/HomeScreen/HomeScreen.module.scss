@@ -35,6 +35,15 @@
   font-size: 0.9rem;
 }
 
+.publicUrl {
+  max-width: 100%;
+  margin-top: 0.35rem;
+  color: var(--color-accent-strong);
+  font-size: 0.85rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -86,7 +95,8 @@
 }
 
 .empty,
-.error {
+.error,
+.status {
   max-width: 42rem;
   margin: 0;
 }
@@ -97,6 +107,11 @@
 
 .error {
   color: var(--color-negative);
+  font-weight: 800;
+}
+
+.status {
+  color: var(--color-muted);
   font-weight: 800;
 }
 

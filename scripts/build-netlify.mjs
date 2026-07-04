@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 
 const distConfigLoaderPath = 'dist/config.js'
 const distConfigTemplatePath = 'dist/config.json'
+const distRedirectsPath = 'dist/_redirects'
 const netlifyConfigFile = '/config.json'
 
 const build = spawnSync('npm', ['run', 'build'], {
@@ -71,5 +72,21 @@ const renderConfigJson = async () => {
   console.log(`Rendered ${distConfigTemplatePath}`)
 }
 
+const renderRedirects = async () => {
+  const template = await fs.readFile(distRedirectsPath, 'utf8')
+  const missingTokens = new Set()
+  const rendered = template.replace(/#\{([A-Z0-9_]+)\}#/g, (_, token) => (
+    requireEnvironmentValue(token, missingTokens)
+  ))
+
+  if (missingTokens.size) {
+    throw new Error(`Missing Netlify environment variables: ${[...missingTokens].join(', ')}`)
+  }
+
+  await fs.writeFile(distRedirectsPath, rendered)
+  console.log(`Rendered ${distRedirectsPath}`)
+}
+
 await renderConfigLoader()
 await renderConfigJson()
+await renderRedirects()
