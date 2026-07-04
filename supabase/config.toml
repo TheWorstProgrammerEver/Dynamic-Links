@@ -384,6 +384,11 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/app-health/index.ts"
 
+[functions.app]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/app/index.ts"
+
 [analytics]
 enabled = true
 port = 54327
