@@ -140,4 +140,17 @@ export const requireLocalFunctionsReady = async () => {
   ) {
     throw new Error('Security integration tests need the public Link Code function mounted. Restart npm run get-going.')
   }
+
+  const publicQrResponse = await fetch(`${url}/functions/v1/public-link-code-qr/__missing__/qr.png`, {
+    signal: AbortSignal.timeout(3000)
+  }).catch(() => undefined)
+
+  const publicQrBody = await publicQrResponse?.text()
+
+  if (
+    publicQrResponse?.status !== 404
+    || publicQrBody !== '{"error":"Link Code QR image not found."}'
+  ) {
+    throw new Error('Security integration tests need the public Link Code QR function mounted. Restart npm run get-going.')
+  }
 }

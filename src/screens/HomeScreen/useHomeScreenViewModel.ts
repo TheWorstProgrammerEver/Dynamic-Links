@@ -1,6 +1,9 @@
 import { useCallback, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { LinkCodeDetailsValidationError } from '../../../common/linkCodeDetails'
-import { createPublicLinkCodeUrl } from '../../../common/linkCodePublicUrls'
+import {
+  createPublicLinkCodeQrUrl,
+  createPublicLinkCodeUrl
+} from '../../../common/linkCodePublicUrls'
 import { useAuthContext } from '../../contexts/AuthContext'
 import { getPublicLinkHost } from '../../data/publicLinks'
 import { useLinkCodes } from '../../state/useLinkCodes'
@@ -168,6 +171,10 @@ export const useHomeScreenViewModel = () => {
     createPublicLinkCodeUrl(publicLinkHost, linkCode.code)
   ), [publicLinkHost])
 
+  const publicQrImageUrlForLinkCode = useCallback((linkCode: LinkCodeSummary) => (
+    createPublicLinkCodeQrUrl(publicLinkHost, linkCode.code)
+  ), [publicLinkHost])
+
   const copyPublicUrl = useCallback(async (linkCode: LinkCodeSummary) => {
     setPublicUrlCopy({})
 
@@ -216,6 +223,7 @@ export const useHomeScreenViewModel = () => {
     linkCodesLoad: linkCodes.linkCodesLoad,
     openEditLinkCode,
     publicUrlCopyStatus: publicUrlCopy,
+    publicQrImageUrlForLinkCode,
     publicUrlForLinkCode,
     responseModeLabels,
     statusLabels
@@ -237,6 +245,7 @@ export const useHomeScreenViewModel = () => {
     newLinkCodeName,
     openEditLinkCode,
     publicUrlCopy,
+    publicQrImageUrlForLinkCode,
     publicUrlForLinkCode,
     requestDeleteLinkCode,
     submitEditLinkCode,

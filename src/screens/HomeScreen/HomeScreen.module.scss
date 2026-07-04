@@ -35,6 +35,30 @@
   font-size: 0.9rem;
 }
 
+.linkCodeDetails {
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.linkCodeText {
+  display: grid;
+  min-width: 0;
+  justify-items: start;
+}
+
+.qrImage {
+  flex: 0 0 7rem;
+  width: 7rem;
+  height: 7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: #fff;
+  object-fit: contain;
+}
+
 .publicUrl {
   max-width: 100%;
   margin-top: 0.35rem;
@@ -121,5 +145,11 @@
 
   p {
     margin: 0;
+  }
+}
+
+@media (max-width: 42rem) {
+  .linkCodeDetails {
+    flex-direction: column;
   }
 }
