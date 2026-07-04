@@ -64,6 +64,15 @@ describe('Link Code details', () => {
         redirectUrl: 'javascript:alert(1)'
       }
     })).toThrow(/http/)
+
+    expect(() => normalizeLinkCodeDetails({
+      displayName: 'Launch page',
+      id: 'link-code-id',
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: 'https://example.com/\r\nx-extra: value'
+      }
+    })).toThrow(/line breaks/)
   })
 
   it('validates custom Link Code strings when present', () => {

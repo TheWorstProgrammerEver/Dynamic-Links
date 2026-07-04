@@ -44,6 +44,10 @@ export const normalizeRedirectUrl = (redirectUrl: string) => {
     throw validationError('Enter a redirect URL.')
   }
 
+  if (/[\r\n]/.test(trimmedRedirectUrl)) {
+    throw validationError('Redirect URL cannot contain line breaks.')
+  }
+
   let parsedUrl: URL
 
   try {

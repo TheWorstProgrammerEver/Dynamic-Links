@@ -4,6 +4,10 @@ import type {
   LinkCodeStatus,
   PublicLinkCodeLookup
 } from '../../../common/linkCodeTypes.ts'
+import {
+  LinkCodeDetailsValidationError,
+  normalizeRedirectUrl
+} from '../../../common/linkCodeDetails.ts'
 import { publicLinkCodeFromResolverPathname } from '../../../common/linkCodePublicUrls.ts'
 
 type PublicLinkCodeRow = {
@@ -23,8 +27,21 @@ const publicLinkCodeFields = [
 ].join(', ')
 
 const responseHeaders = {
-  'cache-control': 'no-store'
+  'cache-control': 'no-store, max-age=0',
+  expires: '0',
+  pragma: 'no-cache'
 }
+
+type PublicLinkCodeResolution =
+  | {
+    lookup: PublicLinkCodeLookup
+    redirectUrl: string
+    responseMode: 'redirect'
+  }
+  | {
+    lookup: PublicLinkCodeLookup
+    responseMode: 'raw_content'
+  }
 
 const safeNotFound = () => Response.json(
   { error: 'Link Code not found.' },
@@ -47,6 +64,14 @@ const serverUnavailable = () => Response.json(
   { headers: responseHeaders, status: 500 }
 )
 
+const redirectTo = (location: string) => new Response(null, {
+  headers: {
+    ...responseHeaders,
+    location
+  },
+  status: 302
+})
+
 const requireEnvironmentValue = (name: string) => {
   const value = Deno.env.get(name)
 
@@ -68,22 +93,57 @@ const createServiceRoleClient = () => createClient(
   }
 )
 
-const isConfigured = (row: PublicLinkCodeRow) => {
+const normalizeStoredRedirectUrl = (redirectUrl: string | null) => {
+  if (!redirectUrl?.trim()) {
+    return undefined
+  }
+
+  try {
+    return normalizeRedirectUrl(redirectUrl)
+  } catch (error) {
+    if (error instanceof LinkCodeDetailsValidationError) {
+      return undefined
+    }
+
+    throw error
+  }
+}
+
+const resolutionFromRow = (row: PublicLinkCodeRow): PublicLinkCodeResolution | undefined => {
   if (row.status !== 'active') {
-    return false
+    return undefined
   }
 
   if (row.response_mode === 'redirect') {
-    return Boolean(row.redirect_url?.trim())
+    const redirectUrl = normalizeStoredRedirectUrl(row.redirect_url)
+
+    return redirectUrl
+      ? {
+        lookup: {
+          code: row.code,
+          responseMode: row.response_mode
+        },
+        redirectUrl,
+        responseMode: row.response_mode
+      }
+      : undefined
   }
 
-  return row.raw_content !== null
+  return row.raw_content === null
+    ? undefined
+    : {
+      lookup: {
+        code: row.code,
+        responseMode: row.response_mode
+      },
+      responseMode: row.response_mode
+    }
 }
 
 const lookupPublicLinkCode = async (
   client: SupabaseClient,
   code: string
-): Promise<PublicLinkCodeLookup | undefined> => {
+): Promise<PublicLinkCodeResolution | undefined> => {
   const { data, error } = await client
     .from('link_codes')
     .select(publicLinkCodeFields)
@@ -100,14 +160,7 @@ const lookupPublicLinkCode = async (
 
   const row = data as PublicLinkCodeRow
 
-  if (!isConfigured(row)) {
-    return undefined
-  }
-
-  return {
-    code: row.code,
-    responseMode: row.response_mode
-  }
+  return resolutionFromRow(row)
 }
 
 export default {
@@ -123,11 +176,15 @@ export default {
     }
 
     try {
-      const lookup = await lookupPublicLinkCode(createServiceRoleClient(), code)
+      const resolution = await lookupPublicLinkCode(createServiceRoleClient(), code)
 
-      return lookup
-        ? Response.json(lookup, { headers: responseHeaders })
-        : safeNotFound()
+      if (!resolution) {
+        return safeNotFound()
+      }
+
+      return resolution.responseMode === 'redirect'
+        ? redirectTo(resolution.redirectUrl)
+        : Response.json(resolution.lookup, { headers: responseHeaders })
     } catch (error) {
       console.error(error)
 
