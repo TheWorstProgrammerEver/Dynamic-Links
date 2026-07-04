@@ -1,8 +1,12 @@
 export type {
   DeletedLinkCode,
   DeleteLinkCodeParams,
+  LinkCodeRawContentResponseConfig,
+  LinkCodeRedirectResponseConfig,
+  LinkCodeResponseConfig,
   LinkCodeResponseMode,
   LinkCodeStatus,
   LinkCodeSummary,
-  LinkCodesState
+  LinkCodesState,
+  UpdateLinkCodeDetailsParams
 } from '../../common/linkCodeTypes'

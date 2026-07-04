@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLoader } from '../../lib/hooks/useLoader'
 import { appDispatcher } from '../data/app/appDispatcher'
-import { CreateLinkCodeCommand, DeleteLinkCodeCommand, LoadLinkCodesQuery } from '../data/app/requests'
+import {
+  CreateLinkCodeCommand,
+  DeleteLinkCodeCommand,
+  LoadLinkCodesQuery,
+  UpdateLinkCodeDetailsCommand
+} from '../data/app/requests'
 import type { Account } from '../types/auth'
-import type { LinkCodesState } from '../types/linkCodes'
-import { addCreatedLinkCode, removeDeletedLinkCode } from './linkCodeStateUpdates'
+import type { LinkCodesState, UpdateLinkCodeDetailsParams } from '../types/linkCodes'
+import { addCreatedLinkCode, removeDeletedLinkCode, replaceUpdatedLinkCode } from './linkCodeStateUpdates'
 
 const emptyState: LinkCodesState = {
   linkCodes: []
@@ -19,6 +24,7 @@ export const useLinkCodes = (currentAccount?: Account) => {
   const linkCodesLoad = useLoader({ getErrorMessage: errorMessage })
   const createLinkCodeLoad = useLoader({ getErrorMessage: errorMessage })
   const deleteLinkCodeLoad = useLoader({ getErrorMessage: errorMessage })
+  const updateLinkCodeLoad = useLoader({ getErrorMessage: errorMessage })
   const linkCodesLoadState = useMemo(() => ({
     ...linkCodesLoad,
     busy: Boolean(currentAccount) && (!linkCodesLoad.settled || linkCodesLoad.busy)
@@ -42,6 +48,15 @@ export const useLinkCodes = (currentAccount?: Account) => {
     return deletedLinkCode
   }, [deleteLinkCodeLoad.execute])
 
+  const updateLinkCodeDetails = useCallback(async (params: UpdateLinkCodeDetailsParams) => {
+    const linkCode = await updateLinkCodeLoad.execute(() => (
+      appDispatcher.dispatch(new UpdateLinkCodeDetailsCommand(params))
+    ))
+    setState((currentState) => replaceUpdatedLinkCode(currentState, linkCode))
+
+    return linkCode
+  }, [updateLinkCodeLoad.execute])
+
   const reloadLinkCodes = useCallback(async () => {
     try {
       const nextState = await linkCodesLoad.execute(() => appDispatcher.dispatch(new LoadLinkCodesQuery()))
@@ -63,6 +78,7 @@ export const useLinkCodes = (currentAccount?: Account) => {
       createLinkCodeLoad.clearError()
       deleteLinkCodeLoad.clearError()
       linkCodesLoad.clearError()
+      updateLinkCodeLoad.clearError()
 
       return () => {
         active = false
@@ -89,7 +105,8 @@ export const useLinkCodes = (currentAccount?: Account) => {
     currentAccount,
     deleteLinkCodeLoad.clearError,
     linkCodesLoad.clearError,
-    linkCodesLoad.execute
+    linkCodesLoad.execute,
+    updateLinkCodeLoad.clearError
   ])
 
   return {
@@ -100,6 +117,8 @@ export const useLinkCodes = (currentAccount?: Account) => {
     linkCodes: state.linkCodes,
     linkCodesLoad: linkCodesLoadState,
     reloadLinkCodes,
-    state
+    state,
+    updateLinkCodeDetails,
+    updateLinkCodeLoad
   }
 }

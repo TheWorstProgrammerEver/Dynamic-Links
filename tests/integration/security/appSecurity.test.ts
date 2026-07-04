@@ -18,6 +18,10 @@ type LinkCodeRow = {
   display_name: string
   id: string
   owner_user_id: string
+  raw_content: string | null
+  raw_content_type: string | null
+  raw_status_code: number | null
+  redirect_url: string | null
   response_mode: string
   status: string
 }
@@ -47,7 +51,7 @@ const invokeApp = (client: SupabaseClient, identifier: string, params: unknown =
 const selectLinkCodes = async (client: SupabaseClient) => {
   const { data, error } = await client
     .from('link_codes')
-    .select('id, owner_user_id, display_name, code, response_mode, status')
+    .select('id, owner_user_id, display_name, code, redirect_url, raw_content, raw_content_type, raw_status_code, response_mode, status')
     .order('display_name', { ascending: true })
 
   if (error) {
@@ -127,6 +131,10 @@ describe('app security integration', () => {
     expect(ownerState.linkCodes[0]).toEqual(expect.objectContaining({
       code: `${securityFixture.prefix}-visible`,
       displayName: `${securityFixture.prefix} visible Link Code`,
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: 'https://example.com/visible'
+      },
       responseMode: 'redirect',
       status: 'active'
     }))
@@ -145,6 +153,10 @@ describe('app security integration', () => {
       expect(error).toBeFalsy()
       expect(data).toEqual(expect.objectContaining({
         displayName: `${securityFixture.prefix} created Link Code`,
+        responseConfig: {
+          mode: 'redirect',
+          redirectUrl: ''
+        },
         responseMode: 'redirect',
         status: 'draft'
       }))
@@ -249,6 +261,113 @@ describe('app security integration', () => {
     expect(row?.display_name).toBe(`${securityFixture.prefix} hidden Link Code`)
   })
 
+  test('Link Code owners can update details through the app function', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      const { data: created, error: createError } = await createAdminClient()
+        .from('link_codes')
+        .insert({
+          owner_user_id: securityFixture.users.owner.id,
+          display_name: `${securityFixture.prefix} update through function`,
+          code: `${securityFixture.prefix}-update-function`,
+          response_mode: 'redirect',
+          status: 'draft'
+        })
+        .select('id')
+        .single()
+      createdId = created?.id
+
+      expect(createError).toBeFalsy()
+
+      const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+        displayName: ` ${securityFixture.prefix} updated content `,
+        id: createdId,
+        responseConfig: {
+          content: 'Updated content',
+          contentType: 'text/html; charset=utf-8',
+          mode: 'raw_content',
+          statusCode: 202
+        }
+      })
+
+      expect(error).toBeFalsy()
+      expect(data).toEqual(expect.objectContaining({
+        displayName: `${securityFixture.prefix} updated content`,
+        id: createdId,
+        responseConfig: {
+          content: 'Updated content',
+          contentType: 'text/html; charset=utf-8',
+          mode: 'raw_content',
+          statusCode: 202
+        },
+        responseMode: 'raw_content'
+      }))
+
+      const { data: row, error: rowError } = await createAdminClient()
+        .from('link_codes')
+        .select('display_name, redirect_url, raw_content, raw_content_type, raw_status_code, response_mode')
+        .eq('id', createdId)
+        .single()
+
+      expect(rowError).toBeFalsy()
+      expect(row).toEqual({
+        display_name: `${securityFixture.prefix} updated content`,
+        raw_content: 'Updated content',
+        raw_content_type: 'text/html; charset=utf-8',
+        raw_status_code: 202,
+        redirect_url: null,
+        response_mode: 'raw_content'
+      })
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('Link Code updates reject invalid redirect URLs through the app function', async () => {
+    const securityFixture = requireFixture()
+    const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+      displayName: `${securityFixture.prefix} invalid redirect`,
+      id: securityFixture.linkCodes.visible,
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: 'javascript:alert(1)'
+      }
+    })
+
+    expect(error).toBeTruthy()
+    expect(data).toBeFalsy()
+  })
+
+  test('Link Code owners cannot update another owner row through the app function', async () => {
+    const securityFixture = requireFixture()
+    const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+      displayName: `${securityFixture.prefix} stolen`,
+      id: securityFixture.linkCodes.hidden,
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: 'https://example.com/stolen'
+      }
+    })
+
+    expect(error).toBeTruthy()
+    expect(data).toBeFalsy()
+
+    const { data: row, error: rowError } = await createAdminClient()
+      .from('link_codes')
+      .select('display_name, redirect_url, response_mode')
+      .eq('id', securityFixture.linkCodes.hidden)
+      .single()
+
+    expect(rowError).toBeFalsy()
+    expect(row).toEqual({
+      display_name: `${securityFixture.prefix} hidden Link Code`,
+      redirect_url: null,
+      response_mode: 'raw_content'
+    })
+  })
+
   test('Link Code owners only read their own rows directly', async () => {
     const securityFixture = requireFixture()
     const ownerRows = await selectLinkCodes(ownerClient)
@@ -275,7 +394,11 @@ describe('app security integration', () => {
 
     const crossOwnerUpdate = await ownerClient
       .from('link_codes')
-      .update({ display_name: `${securityFixture.prefix} updated by owner` })
+      .update({
+        display_name: `${securityFixture.prefix} updated by owner`,
+        redirect_url: 'https://example.com/cross-owner',
+        response_mode: 'redirect'
+      })
       .eq('id', securityFixture.linkCodes.hidden)
       .select('id')
 
