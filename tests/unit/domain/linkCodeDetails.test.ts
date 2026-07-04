@@ -117,9 +117,20 @@ describe('Link Code details', () => {
         content: 'Hello',
         contentType: 'text/plain',
         mode: 'raw_content',
-        statusCode: 99
+        statusCode: 199
       }
-    })).toThrow(/100 to 599/)
+    })).toThrow(/200 to 599/)
+
+    expect(() => normalizeLinkCodeDetails({
+      displayName: 'Content page',
+      id: 'link-code-id',
+      responseConfig: {
+        content: 'Hello',
+        contentType: 'text/plain',
+        mode: 'raw_content',
+        statusCode: 204
+      }
+    })).toThrow(/response body/)
 
     expect(() => normalizeLinkCodeDetails({
       displayName: 'Content page',

@@ -77,7 +77,7 @@ describe('Link Code edit form', () => {
         'Updated'
       ),
       'rawStatusCode',
-      '204'
+      '202'
     )
 
     expect(linkCodeEditFormToUpdateParams(form)).toEqual({
@@ -87,7 +87,7 @@ describe('Link Code edit form', () => {
         content: 'Updated',
         contentType: 'text/plain; charset=utf-8',
         mode: 'raw_content',
-        statusCode: 204
+        statusCode: 202
       }
     })
   })

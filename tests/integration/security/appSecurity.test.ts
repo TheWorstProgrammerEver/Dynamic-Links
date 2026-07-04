@@ -110,6 +110,8 @@ const insertLinkCode = async ({
   displayName,
   ownerUserId,
   rawContent = null,
+  rawContentType,
+  rawStatusCode,
   redirectUrl = null,
   responseMode = 'redirect',
   status = 'active'
@@ -118,23 +120,43 @@ const insertLinkCode = async ({
   displayName: string
   ownerUserId: string
   rawContent?: string | null
+  rawContentType?: string
+  rawStatusCode?: number
   redirectUrl?: string | null
   responseMode?: string
   status?: string
 }) => {
+  const row: {
+    code: string
+    display_name: string
+    owner_user_id: string
+    raw_content: string | null
+    raw_content_type?: string
+    raw_status_code?: number
+    redirect_url: string | null
+    response_mode: string
+    status: string
+  } = {
+    owner_user_id: ownerUserId,
+    display_name: displayName,
+    code,
+    raw_content: rawContent,
+    redirect_url: redirectUrl,
+    response_mode: responseMode,
+    status
+  }
+
+  if (rawContentType !== undefined) {
+    row.raw_content_type = rawContentType
+  }
+
+  if (rawStatusCode !== undefined) {
+    row.raw_status_code = rawStatusCode
+  }
+
   const { data, error } = await createAdminClient()
     .from('link_codes')
-    .insert({
-      owner_user_id: ownerUserId,
-      display_name: displayName,
-      code,
-      raw_content: rawContent,
-      raw_content_type: 'text/plain; charset=utf-8',
-      raw_status_code: 200,
-      redirect_url: redirectUrl,
-      response_mode: responseMode,
-      status
-    })
+    .insert(row)
     .select('id')
     .single()
 
@@ -297,7 +319,33 @@ describe('app security integration', () => {
     }
   })
 
-  test('configured content-mode Link Codes do not redirect through the public function', async () => {
+  test('unconfigured content-mode Link Codes return a safe public 404', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} unconfigured content Link Code`,
+        code: `${securityFixture.prefix}-content-unconfigured`,
+        rawContent: null,
+        responseMode: 'raw_content'
+      })
+
+      const response = await fetchPublicLinkCode(`${securityFixture.prefix}-content-unconfigured`)
+      const body = await response.json()
+
+      expect(response.status).toBe(404)
+      expect(response.headers.get('location')).toBeNull()
+      expect(body).toEqual({ error: 'Link Code not found.' })
+      expect(JSON.stringify(body)).not.toContain(securityFixture.users.owner.id)
+      expect(JSON.stringify(body)).not.toContain('unconfigured content Link Code')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('configured content-mode Link Codes serve raw content through the public function', async () => {
     const securityFixture = requireFixture()
     let createdId: string | undefined
 
@@ -306,21 +354,73 @@ describe('app security integration', () => {
         ownerUserId: securityFixture.users.owner.id,
         displayName: `${securityFixture.prefix} public content Link Code`,
         code: `${securityFixture.prefix}-content`,
-        rawContent: 'public content',
+        rawContent: '<h1>Public content</h1>',
+        rawContentType: 'text/html; charset=utf-8',
+        rawStatusCode: 203,
         responseMode: 'raw_content'
       })
 
       const response = await fetchPublicLinkCode(`${securityFixture.prefix}-content`)
-      const body = await response.json()
+      const body = await response.text()
 
-      expect(response.status).toBe(200)
+      expect(response.status).toBe(203)
+      expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8')
+      expect(response.headers.get('cache-control')).toContain('no-store')
       expect(response.headers.get('location')).toBeNull()
-      expect(body).toEqual({
-        code: `${securityFixture.prefix}-content`,
+      expect(body).toBe('<h1>Public content</h1>')
+      expect(body).not.toContain(securityFixture.users.owner.id)
+      expect(body).not.toContain('public content Link Code')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('content-mode Link Codes use default response metadata when optional metadata is absent', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} default content metadata Link Code`,
+        code: `${securityFixture.prefix}-content-defaults`,
+        rawContent: 'default public content',
         responseMode: 'raw_content'
       })
-      expect(JSON.stringify(body)).not.toContain(securityFixture.users.owner.id)
-      expect(JSON.stringify(body)).not.toContain('public content Link Code')
+
+      const response = await fetchPublicLinkCode(`${securityFixture.prefix}-content-defaults`)
+      const body = await response.text()
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8')
+      expect(response.headers.get('location')).toBeNull()
+      expect(body).toBe('default public content')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('redirect-mode Link Codes do not serve stale raw content through the public function', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} stale content redirect Link Code`,
+        code: `${securityFixture.prefix}-redirect-stale-content`,
+        rawContent: 'stale public content',
+        redirectUrl: 'https://example.com/stale-content',
+        responseMode: 'redirect'
+      })
+
+      const response = await fetchPublicLinkCode(`${securityFixture.prefix}-redirect-stale-content`)
+      const body = await response.text()
+
+      expect(response.status).toBe(302)
+      expect(response.headers.get('location')).toBe('https://example.com/stale-content')
+      expect(body).toBe('')
+      expect(`${response.headers.get('location') ?? ''}${body}`).not.toContain('stale public content')
     } finally {
       await deleteLinkCode(createdId)
     }
@@ -420,6 +520,59 @@ describe('app security integration', () => {
 
       expect(secondResponse.status).toBe(302)
       expect(secondResponse.headers.get('location')).toBe('https://example.com/second?source=update')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('updated raw content changes public responses without changing the public path', async () => {
+    const securityFixture = requireFixture()
+    const code = `${securityFixture.prefix}-mutable-content`
+    const publicPath = createPublicLinkCodePath(code)
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} mutable content Link Code`,
+        code,
+        rawContent: 'first content',
+        responseMode: 'raw_content'
+      })
+
+      const firstResponse = await fetchPublicLinkCode(code)
+
+      expect(firstResponse.status).toBe(200)
+      expect(await firstResponse.text()).toBe('first content')
+
+      const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+        displayName: `${securityFixture.prefix} mutable content Link Code`,
+        id: createdId,
+        responseConfig: {
+          content: '{"message":"second content"}',
+          contentType: 'application/json; charset=utf-8',
+          mode: 'raw_content',
+          statusCode: 202
+        }
+      })
+
+      expect(error).toBeFalsy()
+      expect(data).toEqual(expect.objectContaining({
+        code,
+        responseConfig: {
+          content: '{"message":"second content"}',
+          contentType: 'application/json; charset=utf-8',
+          mode: 'raw_content',
+          statusCode: 202
+        }
+      }))
+      expect(createPublicLinkCodePath(code)).toBe(publicPath)
+
+      const secondResponse = await fetchPublicLinkCode(code)
+
+      expect(secondResponse.status).toBe(202)
+      expect(secondResponse.headers.get('content-type')).toBe('application/json; charset=utf-8')
+      expect(await secondResponse.text()).toBe('{"message":"second content"}')
     } finally {
       await deleteLinkCode(createdId)
     }
@@ -811,6 +964,38 @@ describe('app security integration', () => {
 
     expect(rowError).toBeFalsy()
     expect(row?.redirect_url).toBe('https://example.com/visible')
+  })
+
+  test('Link Code owners cannot directly store raw content statuses that cannot carry bodies', async () => {
+    const securityFixture = requireFixture()
+    const informationalStatusUpdate = await ownerClient
+      .from('link_codes')
+      .update({
+        raw_status_code: 199
+      })
+      .eq('id', securityFixture.linkCodes.visible)
+      .select('id')
+
+    expect(informationalStatusUpdate.error).toBeTruthy()
+
+    const bodylessStatusUpdate = await ownerClient
+      .from('link_codes')
+      .update({
+        raw_status_code: 204
+      })
+      .eq('id', securityFixture.linkCodes.visible)
+      .select('id')
+
+    expect(bodylessStatusUpdate.error).toBeTruthy()
+
+    const { data: row, error: rowError } = await createAdminClient()
+      .from('link_codes')
+      .select('raw_status_code')
+      .eq('id', securityFixture.linkCodes.visible)
+      .single()
+
+    expect(rowError).toBeFalsy()
+    expect(row?.raw_status_code).toBe(200)
   })
 
   test('Link Code owners cannot update another owner row through the app function', async () => {

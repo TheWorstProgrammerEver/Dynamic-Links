@@ -1,26 +1,17 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import type {
-  LinkCodeResponseMode,
-  LinkCodeStatus,
-  PublicLinkCodeLookup
-} from '../../../common/linkCodeTypes.ts'
 import {
-  LinkCodeDetailsValidationError,
-  normalizeRedirectUrl
-} from '../../../common/linkCodeDetails.ts'
+  resolvePublicLinkCodeRow,
+  type PublicLinkCodeResolution,
+  type PublicLinkCodeResolverRow
+} from '../../../common/publicLinkCodeResolution.ts'
 import { publicLinkCodeFromResolverPathname } from '../../../common/linkCodePublicUrls.ts'
 
-type PublicLinkCodeRow = {
-  code: string
-  raw_content: string | null
-  redirect_url: string | null
-  response_mode: LinkCodeResponseMode
-  status: LinkCodeStatus
-}
+type PublicLinkCodeRow = PublicLinkCodeResolverRow
 
 const publicLinkCodeFields = [
-  'code',
   'raw_content',
+  'raw_content_type',
+  'raw_status_code',
   'redirect_url',
   'response_mode',
   'status'
@@ -31,17 +22,6 @@ const responseHeaders = {
   expires: '0',
   pragma: 'no-cache'
 }
-
-type PublicLinkCodeResolution =
-  | {
-    lookup: PublicLinkCodeLookup
-    redirectUrl: string
-    responseMode: 'redirect'
-  }
-  | {
-    lookup: PublicLinkCodeLookup
-    responseMode: 'raw_content'
-  }
 
 const safeNotFound = () => Response.json(
   { error: 'Link Code not found.' },
@@ -72,6 +52,16 @@ const redirectTo = (location: string) => new Response(null, {
   status: 302
 })
 
+const respondWithRawContent = (resolution: Extract<PublicLinkCodeResolution, { responseMode: 'raw_content' }>) => (
+  new Response(resolution.body, {
+    headers: {
+      ...responseHeaders,
+      'content-type': resolution.contentType
+    },
+    status: resolution.statusCode
+  })
+)
+
 const requireEnvironmentValue = (name: string) => {
   const value = Deno.env.get(name)
 
@@ -93,53 +83,6 @@ const createServiceRoleClient = () => createClient(
   }
 )
 
-const normalizeStoredRedirectUrl = (redirectUrl: string | null) => {
-  if (!redirectUrl?.trim()) {
-    return undefined
-  }
-
-  try {
-    return normalizeRedirectUrl(redirectUrl)
-  } catch (error) {
-    if (error instanceof LinkCodeDetailsValidationError) {
-      return undefined
-    }
-
-    throw error
-  }
-}
-
-const resolutionFromRow = (row: PublicLinkCodeRow): PublicLinkCodeResolution | undefined => {
-  if (row.status !== 'active') {
-    return undefined
-  }
-
-  if (row.response_mode === 'redirect') {
-    const redirectUrl = normalizeStoredRedirectUrl(row.redirect_url)
-
-    return redirectUrl
-      ? {
-        lookup: {
-          code: row.code,
-          responseMode: row.response_mode
-        },
-        redirectUrl,
-        responseMode: row.response_mode
-      }
-      : undefined
-  }
-
-  return row.raw_content === null
-    ? undefined
-    : {
-      lookup: {
-        code: row.code,
-        responseMode: row.response_mode
-      },
-      responseMode: row.response_mode
-    }
-}
-
 const lookupPublicLinkCode = async (
   client: SupabaseClient,
   code: string
@@ -160,7 +103,7 @@ const lookupPublicLinkCode = async (
 
   const row = data as PublicLinkCodeRow
 
-  return resolutionFromRow(row)
+  return resolvePublicLinkCodeRow(row)
 }
 
 export default {
@@ -184,7 +127,7 @@ export default {
 
       return resolution.responseMode === 'redirect'
         ? redirectTo(resolution.redirectUrl)
-        : Response.json(resolution.lookup, { headers: responseHeaders })
+        : respondWithRawContent(resolution)
     } catch (error) {
       console.error(error)
 
