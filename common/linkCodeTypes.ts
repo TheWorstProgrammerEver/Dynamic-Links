@@ -14,3 +14,7 @@ export type LinkCodeSummary = {
 export type LinkCodesState = {
   linkCodes: LinkCodeSummary[]
 }
+
+export type CreateLinkCodeParams = {
+  displayName: string
+}

@@ -59,6 +59,17 @@ const selectLinkCodes = async (client: SupabaseClient) => {
 
 const ids = (rows: Array<{ id: string }>) => rows.map((row) => row.id)
 
+const deleteLinkCode = async (id?: string) => {
+  if (!id) {
+    return
+  }
+
+  await createAdminClient()
+    .from('link_codes')
+    .delete()
+    .eq('id', id)
+}
+
 beforeAll(async () => {
   await requireLocalFunctionsReady()
   fixture = await createSecurityFixture()
@@ -119,6 +130,65 @@ describe('app security integration', () => {
       responseMode: 'redirect',
       status: 'active'
     }))
+  })
+
+  test('Link Code owners can create named random Link Codes through the app function', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.createLinkCode, {
+        displayName: ` ${securityFixture.prefix} created Link Code `
+      })
+      createdId = data?.id
+
+      expect(error).toBeFalsy()
+      expect(data).toEqual(expect.objectContaining({
+        displayName: `${securityFixture.prefix} created Link Code`,
+        responseMode: 'redirect',
+        status: 'draft'
+      }))
+      expect(data.code).toEqual(expect.any(String))
+      expect(data.code.length).toBeGreaterThanOrEqual(8)
+
+      const { data: row, error: rowError } = await createAdminClient()
+        .from('link_codes')
+        .select('owner_user_id')
+        .eq('id', createdId)
+        .single()
+
+      expect(rowError).toBeFalsy()
+      expect(row?.owner_user_id).toBe(securityFixture.users.owner.id)
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('Link Code owners cannot create app-function rows for another account', async () => {
+    const securityFixture = requireFixture()
+    let createdId: string | undefined
+
+    try {
+      const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.createLinkCode, {
+        displayName: `${securityFixture.prefix} owner-scoped create`,
+        ownerUserId: securityFixture.users.outsider.id,
+        owner_user_id: securityFixture.users.outsider.id
+      })
+      createdId = data?.id
+
+      expect(error).toBeFalsy()
+
+      const { data: row, error: rowError } = await createAdminClient()
+        .from('link_codes')
+        .select('owner_user_id')
+        .eq('id', createdId)
+        .single()
+
+      expect(rowError).toBeFalsy()
+      expect(row?.owner_user_id).toBe(securityFixture.users.owner.id)
+    } finally {
+      await deleteLinkCode(createdId)
+    }
   })
 
   test('Link Code owners only read their own rows directly', async () => {
