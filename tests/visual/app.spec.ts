@@ -94,6 +94,12 @@ test('creates an account, signs out, and signs back in', async ({ page }) => {
   const launchPageRow = page.getByRole('listitem').filter({ hasText: 'Launch page' })
   await expect(launchPageRow).toBeVisible()
   await expect(page.locator('code').filter({ hasText: /^[23456789abcdefghijkmnpqrstuvwxyz]{8,}$/ })).toBeVisible()
+  const qrImage = launchPageRow.getByRole('img', { name: 'QR code for Launch page' })
+  await expect(qrImage).toBeVisible()
+  await expect(qrImage).toHaveAttribute('src', /\/code\/[^/]+\/qr\.png$/)
+  await expect.poll(async () => (
+    await qrImage.evaluate((image) => (image as HTMLImageElement).naturalWidth)
+  )).toBeGreaterThan(0)
   await expect(page.getByText('No Link Codes yet')).not.toBeVisible()
 
   await page.getByRole('link', { name: `Open profile for ${email}` }).click()

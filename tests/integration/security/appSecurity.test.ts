@@ -1,8 +1,19 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { appRequestIdentifiers, appRequestNames } from '../../../common/appRequestIdentifiers'
-import { createPublicLinkCodePath } from '../../../common/linkCodePublicUrls'
+import {
+  createPublicLinkCodePath,
+  createPublicLinkCodeQrPath,
+  createPublicLinkCodeQrUrl,
+  createPublicLinkCodeUrl
+} from '../../../common/linkCodePublicUrls'
+import {
+  createPublicLinkCodeQrEtag,
+  publicLinkCodeQrImageCacheControl,
+  publicLinkCodeQrImageContentType
+} from '../../../common/linkCodeQrImages'
 import {
   createAdminClient,
   createAnonymousClient,
@@ -33,6 +44,21 @@ let fixture: SecurityFixture | undefined
 let anonymousClient: SupabaseClient
 let ownerClient: SupabaseClient
 let outsiderClient: SupabaseClient
+const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10]
+
+const getLocalPublicLinkHost = () => {
+  try {
+    const config = JSON.parse(readFileSync('public/config.local.json', 'utf8')) as {
+      publicLinks?: {
+        host?: string
+      }
+    }
+
+    return config.publicLinks?.host ?? 'http://127.0.0.1:5173'
+  } catch {
+    return 'http://127.0.0.1:5173'
+  }
+}
 
 const requireFixture = () => {
   if (!fixture) {
@@ -131,6 +157,14 @@ const fetchPublicLinkCode = async (code: string) => {
   })
 }
 
+const fetchPublicLinkCodeQr = async (code: string, headers: Record<string, string> = {}) => {
+  const { url } = getLocalSupabaseConfig()
+
+  return await fetch(`${url}/functions/v1/public-link-code-qr/${encodeURIComponent(code)}/qr.png`, {
+    headers
+  })
+}
+
 beforeAll(async () => {
   await requireLocalFunctionsReady()
   fixture = await createSecurityFixture()
@@ -174,6 +208,45 @@ describe('app security integration', () => {
 
     expect(createPublicLinkCodePath(`${securityFixture.prefix}-visible`))
       .toBe(`/code/${encodeURIComponent(`${securityFixture.prefix}-visible`)}`)
+  })
+
+  test('public QR image route returns a cacheable PNG for the canonical public URL', async () => {
+    const securityFixture = requireFixture()
+    const code = `${securityFixture.prefix}-visible`
+    const publicTestHost = getLocalPublicLinkHost()
+    const sourceUrl = createPublicLinkCodeUrl(publicTestHost, code)
+    const response = await fetchPublicLinkCodeQr(code)
+    const body = new Uint8Array(await response.arrayBuffer())
+    const etag = response.headers.get('etag')
+
+    expect(createPublicLinkCodeQrPath(code))
+      .toBe(`/code/${encodeURIComponent(code)}/qr.png`)
+    expect(createPublicLinkCodeQrUrl(publicTestHost, code))
+      .toBe(`${sourceUrl}/qr.png`)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe(publicLinkCodeQrImageContentType)
+    expect(response.headers.get('cache-control')).toBe(publicLinkCodeQrImageCacheControl)
+    expect(etag).toBe(await createPublicLinkCodeQrEtag(sourceUrl))
+    expect(Array.from(body.slice(0, pngSignature.length))).toEqual(pngSignature)
+
+    const cachedResponse = await fetchPublicLinkCodeQr(code, {
+      'if-none-match': etag ?? ''
+    })
+    const cachedBody = new Uint8Array(await cachedResponse.arrayBuffer())
+
+    expect(cachedResponse.status).toBe(304)
+    expect(cachedBody).toHaveLength(0)
+  })
+
+  test('unknown public QR image requests return a non-image 404', async () => {
+    const securityFixture = requireFixture()
+    const response = await fetchPublicLinkCodeQr(`${securityFixture.prefix}-missing`)
+    const body = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(response.headers.get('content-type')).toContain('application/json')
+    expect(response.headers.get('content-type')).not.toContain('image/png')
+    expect(body).toEqual({ error: 'Link Code QR image not found.' })
   })
 
   test('anonymous users are redirected by configured redirect Link Codes through the public function', async () => {

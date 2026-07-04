@@ -14,6 +14,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const run = (command, args, options = {}) => new Promise((resolve, reject) => {
   const child = spawn(command, args, {
+    env: {
+      ...process.env,
+      ...options.env
+    },
     stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
     shell: false
   })
@@ -93,6 +97,7 @@ const writeLocalConfig = (lanAddress) => {
     : 'No public/config.local.json found; generating one for this machine...')
 
   const appHost = lanAddress ?? 'localhost'
+  const publicLinkHost = `http://${appHost}:${appPort}`
   const configTemplate = readFileSync('public/config.json', 'utf8')
   const config = JSON.parse(
     configTemplate
@@ -102,7 +107,7 @@ const writeLocalConfig = (lanAddress) => {
       .replaceAll('#{AUTH_PASSKEY_ENABLED}#', 'true')
       .replaceAll('#{AUTH_OTP_ENABLED}#', 'true')
       .replaceAll('#{AUTH_MAGIC_LINK_ENABLED}#', 'true')
-      .replaceAll('"#{PUBLIC_LINK_HOST}#"', `"http://${appHost}:${appPort}"`)
+      .replaceAll('"#{PUBLIC_LINK_HOST}#"', JSON.stringify(publicLinkHost))
       .replaceAll('"#{SUPABASE_URL}#"', '"http://127.0.0.1:54321"')
       .replaceAll('"#{SUPABASE_PUBLISHABLE_KEY}#"', '"sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"')
   )
@@ -114,7 +119,7 @@ const writeLocalConfig = (lanAddress) => {
     environment: 'local',
     publicLinks: {
       ...config.publicLinks,
-      host: `http://${appHost}:${appPort}`
+      host: publicLinkHost
     },
     supabase: {
       ...config.supabase,
@@ -123,6 +128,8 @@ const writeLocalConfig = (lanAddress) => {
   }
 
   writeFileSync('public/config.local.json', `${JSON.stringify(localConfig, null, 2)}\n`)
+
+  return publicLinkHost
 }
 
 const ensureDependencies = async () => {
@@ -180,12 +187,16 @@ const disableSupabaseContainerRestarts = async () => {
   await run('docker', ['update', '--restart=no', ...containerIds])
 }
 
-const startSupabase = async () => {
+const startSupabase = async (publicLinkHost) => {
   console.log('Starting Supabase...')
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      await run('npm', ['run', 'supabase:start'])
+      await run('npm', ['run', 'supabase:start'], {
+        env: {
+          PUBLIC_LINK_HOST: publicLinkHost
+        }
+      })
       break
     } catch (error) {
       if (attempt === 3) {
@@ -200,9 +211,13 @@ const startSupabase = async () => {
   await waitFor('Supabase API', () => httpOk(`http://127.0.0.1:${supabasePort}/auth/v1/settings`))
 }
 
-const startManagedProcess = (label, command, args) => {
+const startManagedProcess = (label, command, args, options = {}) => {
   console.log(`Starting ${label}...`)
   const child = spawn(command, args, {
+    env: {
+      ...process.env,
+      ...options.env
+    },
     stdio: 'inherit',
     shell: false
   })
@@ -216,14 +231,18 @@ const startManagedProcess = (label, command, args) => {
   managedProcesses.push(child)
 }
 
-const ensureEdgeFunctions = async () => {
+const ensureEdgeFunctions = async (publicLinkHost) => {
   const healthUrl = `http://127.0.0.1:${supabasePort}/functions/v1/app-health`
 
   if (await httpOk(healthUrl)) {
     return
   }
 
-  startManagedProcess('Supabase Edge Functions', 'npm', ['run', 'supabase:functions:serve'])
+  startManagedProcess('Supabase Edge Functions', 'npm', ['run', 'supabase:functions:serve'], {
+    env: {
+      PUBLIC_LINK_HOST: publicLinkHost
+    }
+  })
   await waitFor('Supabase Edge Functions', () => httpOk(healthUrl))
 }
 
@@ -324,11 +343,11 @@ const main = async () => {
   const lanAddress = getLanAddress()
 
   await ensureDependencies()
-  writeLocalConfig(lanAddress)
+  const publicLinkHost = writeLocalConfig(lanAddress)
   await ensureDocker()
-  await startSupabase()
+  await startSupabase(publicLinkHost)
   await disableSupabaseContainerRestarts()
-  await ensureEdgeFunctions()
+  await ensureEdgeFunctions(publicLinkHost)
   await ensureVite()
   await printEndpoints(lanAddress)
 

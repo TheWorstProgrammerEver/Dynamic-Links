@@ -1,2 +1,3 @@
+/code/:code/qr.png #{SUPABASE_URL}#/functions/v1/public-link-code-qr/:code/qr.png 200
 /code/* #{SUPABASE_URL}#/functions/v1/public-link-code/:splat 200
 /* /index.html 200

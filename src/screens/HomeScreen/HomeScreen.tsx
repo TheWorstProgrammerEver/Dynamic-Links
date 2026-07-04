@@ -67,6 +67,7 @@ export const HomeScreen = () => {
             <List ariaLabel="Owned Link Codes">
               {viewModel.linkCodes.map((linkCode) => {
                 const publicUrl = viewModel.publicUrlForLinkCode(linkCode)
+                const publicQrImageUrl = viewModel.publicQrImageUrlForLinkCode(linkCode)
                 const copied = viewModel.publicUrlCopyStatus.copiedLinkCodeId === linkCode.id
 
                 return (
@@ -110,18 +111,29 @@ export const HomeScreen = () => {
                     )}
                     actionsLabel={`${linkCode.displayName} actions`}
                     details={(
-                      <>
-                        <strong>{linkCode.displayName}</strong>
-                        <code className={styles.code}>{linkCode.code}</code>
-                        <a className={styles.publicUrl} href={publicUrl} target="_blank" rel="noreferrer">
-                          {publicUrl}
-                        </a>
-                        <span className={styles.meta}>
-                          <span>{viewModel.responseModeLabels[linkCode.responseMode]}</span>
-                          <span>{viewModel.formatResponseConfig(linkCode)}</span>
-                          <span>{viewModel.statusLabels[linkCode.status]}</span>
+                      <span className={styles.linkCodeDetails}>
+                        <img
+                          alt={`QR code for ${linkCode.displayName}`}
+                          className={styles.qrImage}
+                          decoding="async"
+                          height="112"
+                          loading="lazy"
+                          src={publicQrImageUrl}
+                          width="112"
+                        />
+                        <span className={styles.linkCodeText}>
+                          <strong>{linkCode.displayName}</strong>
+                          <code className={styles.code}>{linkCode.code}</code>
+                          <a className={styles.publicUrl} href={publicUrl} target="_blank" rel="noreferrer">
+                            {publicUrl}
+                          </a>
+                          <span className={styles.meta}>
+                            <span>{viewModel.responseModeLabels[linkCode.responseMode]}</span>
+                            <span>{viewModel.formatResponseConfig(linkCode)}</span>
+                            <span>{viewModel.statusLabels[linkCode.status]}</span>
+                          </span>
                         </span>
-                      </>
+                      </span>
                     )}
                   />
                 )
