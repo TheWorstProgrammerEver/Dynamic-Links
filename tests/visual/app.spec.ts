@@ -85,7 +85,8 @@ test('creates an account, signs out, and signs back in', async ({ page }) => {
   const email = await createAccount(page)
 
   await expect(page).toHaveURL('/')
-  await expect(page.getByRole('heading', { name: 'Welcome to Dynamic Links' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Link Codes', exact: true })).toBeVisible()
+  await expect(page.getByText('No Link Codes yet')).toBeVisible()
   await expect(page.getByRole('link', { name: `Open profile for ${email}` })).toBeVisible()
 
   await page.getByRole('link', { name: `Open profile for ${email}` }).click()
