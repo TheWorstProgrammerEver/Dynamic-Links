@@ -12,6 +12,10 @@ const linkCode: LinkCodeSummary = {
   createdDate: '2026-07-04',
   displayName: 'Launch page',
   id: 'link-code-1',
+  responseConfig: {
+    mode: 'redirect',
+    redirectUrl: ''
+  },
   responseMode: 'redirect',
   status: 'active'
 }

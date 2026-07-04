@@ -1,15 +1,29 @@
 import { appRequestIdentifiers } from '../../../../common/appRequestIdentifiers.ts'
-import type { CreateLinkCodeParams, DeleteLinkCodeParams } from '../../../../common/linkCodeTypes.ts'
+import type {
+  CreateLinkCodeParams,
+  DeleteLinkCodeParams,
+  LinkCodeResponseConfig,
+  UpdateLinkCodeDetailsParams
+} from '../../../../common/linkCodeTypes.ts'
 import { HttpError } from '../helpers.ts'
-import { createOwnedLinkCode, deleteOwnedLinkCode, loadOwnedLinkCodes } from '../linkCodes.ts'
+import {
+  createOwnedLinkCode,
+  deleteOwnedLinkCode,
+  loadOwnedLinkCodes,
+  updateOwnedLinkCodeDetails
+} from '../linkCodes.ts'
 import { createAppRequestHandlerFactory } from './handlerFactory.ts'
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+)
+
 const createLinkCodeParams = (params: unknown): CreateLinkCodeParams => {
-  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+  if (!isRecord(params)) {
     throw new HttpError(400, 'Link Code name is required.')
   }
 
-  const displayName = (params as { displayName?: unknown }).displayName
+  const displayName = params.displayName
 
   if (typeof displayName !== 'string') {
     throw new HttpError(400, 'Link Code name is required.')
@@ -19,17 +33,69 @@ const createLinkCodeParams = (params: unknown): CreateLinkCodeParams => {
 }
 
 const deleteLinkCodeParams = (params: unknown): DeleteLinkCodeParams => {
-  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+  if (!isRecord(params)) {
     throw new HttpError(400, 'Link Code ID is required.')
   }
 
-  const id = (params as { id?: unknown }).id
+  const id = params.id
 
   if (typeof id !== 'string' || !id.trim()) {
     throw new HttpError(400, 'Link Code ID is required.')
   }
 
   return { id }
+}
+
+const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsParams => {
+  if (!isRecord(params)) {
+    throw new HttpError(400, 'Link Code details are required.')
+  }
+
+  const { displayName, id, responseConfig } = params
+
+  if (typeof id !== 'string' || typeof displayName !== 'string' || !isRecord(responseConfig)) {
+    throw new HttpError(400, 'Link Code details are required.')
+  }
+
+  if (responseConfig.mode === 'redirect') {
+    if (typeof responseConfig.redirectUrl !== 'string') {
+      throw new HttpError(400, 'Enter a redirect URL.')
+    }
+
+    return {
+      displayName,
+      id,
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: responseConfig.redirectUrl
+      }
+    }
+  }
+
+  if (responseConfig.mode === 'raw_content') {
+    const { content, contentType, statusCode } = responseConfig
+
+    if (
+      typeof content !== 'string'
+      || typeof contentType !== 'string'
+      || typeof statusCode !== 'number'
+    ) {
+      throw new HttpError(400, 'Raw content response details are required.')
+    }
+
+    return {
+      displayName,
+      id,
+      responseConfig: {
+        content,
+        contentType,
+        mode: 'raw_content',
+        statusCode
+      } satisfies LinkCodeResponseConfig
+    }
+  }
+
+  throw new HttpError(400, 'Choose a Link Code response mode.')
 }
 
 export const createCreateLinkCodeHandler = createAppRequestHandlerFactory(
@@ -53,4 +119,13 @@ export const createDeleteLinkCodeHandler = createAppRequestHandlerFactory(
 export const createLoadLinkCodesHandler = createAppRequestHandlerFactory(
   appRequestIdentifiers.loadLinkCodes,
   ({ client, user }) => async () => await loadOwnedLinkCodes(client, user.id)
+)
+
+export const createUpdateLinkCodeDetailsHandler = createAppRequestHandlerFactory(
+  appRequestIdentifiers.updateLinkCodeDetails,
+  ({ client, user }) => async (request) => await updateOwnedLinkCodeDetails(
+    client,
+    user.id,
+    updateLinkCodeDetailsParams(request.params)
+  )
 )

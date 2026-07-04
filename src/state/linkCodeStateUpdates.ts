@@ -12,3 +12,10 @@ export const removeDeletedLinkCode = (state: LinkCodesState, deletedLinkCode: De
   ...state,
   linkCodes: state.linkCodes.filter((linkCode) => linkCode.id !== deletedLinkCode.id)
 })
+
+export const replaceUpdatedLinkCode = (state: LinkCodesState, linkCode: LinkCodeSummary): LinkCodesState => ({
+  ...state,
+  linkCodes: state.linkCodes.map((currentLinkCode) => (
+    currentLinkCode.id === linkCode.id ? linkCode : currentLinkCode
+  ))
+})

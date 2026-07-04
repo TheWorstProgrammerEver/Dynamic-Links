@@ -1,7 +1,8 @@
 export const appRequestIdentifiers = {
   createLinkCode: 'createLinkCode',
   deleteLinkCode: 'deleteLinkCode',
-  loadLinkCodes: 'loadLinkCodes'
+  loadLinkCodes: 'loadLinkCodes',
+  updateLinkCodeDetails: 'updateLinkCodeDetails'
 } as const
 
 export const appRequestNames = Object.values(appRequestIdentifiers)

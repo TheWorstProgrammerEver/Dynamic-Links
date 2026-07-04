@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { AppDialog, DialogFooterActions } from '../../../lib/ui/AppDialog/AppDialog'
 import { AsynchronousSubmitButton } from '../../../lib/ui/AsynchronousSubmitButton/AsynchronousSubmitButton'
 import { Button } from '../../../lib/ui/Button/Button'
@@ -9,6 +9,7 @@ import { List, ListItem } from '../../../lib/ui/List/List'
 import { LoaderContainer } from '../../../lib/ui/LoaderContainer/LoaderContainer'
 import { ResponsiveButton } from '../../../lib/ui/ResponsiveButton/ResponsiveButton'
 import { Section } from '../../../lib/ui/Section/Section'
+import { LinkCodeEditDialog } from './LinkCodeEditDialog'
 import styles from './HomeScreen.module.scss'
 import { useHomeScreenViewModel } from './useHomeScreenViewModel'
 
@@ -68,16 +69,29 @@ export const HomeScreen = () => {
                 <ListItem
                   key={linkCode.id}
                   actions={(
-                    <ComponentRoleContext role="destructive">
-                      <ResponsiveButton
-                        type="button"
-                        icon={<Trash2 />}
-                        label={`Delete ${linkCode.displayName}`}
-                        onClick={() => deleteConfirmation.request(linkCode)}
-                      >
-                        Delete
-                      </ResponsiveButton>
-                    </ComponentRoleContext>
+                    <>
+                      <ComponentRoleContext role="secondary">
+                        <ResponsiveButton
+                          icon={<Pencil />}
+                          label={`Edit ${linkCode.displayName}`}
+                          type="button"
+                          onClick={() => viewModel.openEditLinkCode(linkCode)}
+                        >
+                          Edit
+                        </ResponsiveButton>
+                      </ComponentRoleContext>
+
+                      <ComponentRoleContext role="destructive">
+                        <ResponsiveButton
+                          type="button"
+                          icon={<Trash2 />}
+                          label={`Delete ${linkCode.displayName}`}
+                          onClick={() => deleteConfirmation.request(linkCode)}
+                        >
+                          Delete
+                        </ResponsiveButton>
+                      </ComponentRoleContext>
+                    </>
                   )}
                   actionsLabel={`${linkCode.displayName} actions`}
                   details={(
@@ -86,6 +100,7 @@ export const HomeScreen = () => {
                       <code className={styles.code}>{linkCode.code}</code>
                       <span className={styles.meta}>
                         <span>{viewModel.responseModeLabels[linkCode.responseMode]}</span>
+                        <span>{viewModel.formatResponseConfig(linkCode)}</span>
                         <span>{viewModel.statusLabels[linkCode.status]}</span>
                       </span>
                     </>
@@ -143,6 +158,16 @@ export const HomeScreen = () => {
           )}
         </form>
       </AppDialog>
+
+      <LinkCodeEditDialog
+        error={viewModel.editLinkCodeDialog.error}
+        form={viewModel.editLinkCodeDialog.form}
+        loader={viewModel.editLinkCodeDialog.loader}
+        open={viewModel.editLinkCodeDialog.open}
+        onChange={viewModel.editLinkCodeDialog.updateField}
+        onClose={viewModel.editLinkCodeDialog.close}
+        onSubmit={viewModel.editLinkCodeDialog.submit}
+      />
     </section>
   )
 }

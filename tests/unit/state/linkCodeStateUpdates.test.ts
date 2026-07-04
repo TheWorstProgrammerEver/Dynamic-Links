@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { addCreatedLinkCode, removeDeletedLinkCode } from '../../../src/state/linkCodeStateUpdates'
+import { addCreatedLinkCode, removeDeletedLinkCode, replaceUpdatedLinkCode } from '../../../src/state/linkCodeStateUpdates'
 import type { LinkCodesState, LinkCodeSummary } from '../../../src/types/linkCodes'
 
 const linkCode = (id: string, displayName: string): LinkCodeSummary => ({
@@ -7,6 +7,10 @@ const linkCode = (id: string, displayName: string): LinkCodeSummary => ({
   createdDate: '2026-07-04',
   displayName,
   id,
+  responseConfig: {
+    mode: 'redirect',
+    redirectUrl: ''
+  },
   responseMode: 'redirect',
   status: 'draft'
 })
@@ -37,6 +41,21 @@ describe('Link Code state updates', () => {
 
     expect(removeDeletedLinkCode(state, { id: 'delete' }).linkCodes).toEqual([
       state.linkCodes[0]
+    ])
+  })
+
+  test('replaces an updated Link Code in place without reloading the whole state', () => {
+    const updated = linkCode('update', 'Updated')
+    const state: LinkCodesState = {
+      linkCodes: [
+        linkCode('keep', 'Keep'),
+        linkCode('update', 'Original')
+      ]
+    }
+
+    expect(replaceUpdatedLinkCode(state, updated).linkCodes).toEqual([
+      state.linkCodes[0],
+      updated
     ])
   })
 })
