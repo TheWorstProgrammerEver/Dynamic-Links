@@ -26,7 +26,7 @@ Otherwise, I"m happy for you to put completed work into "In Testing".
 
 As usual, ensure you link GitHub PR's (or, if no PR's raised at least commits) in the Linear issue comments for the relevant issue.
 
-Any questions or blockages, leave a comment on the Linear issue and put 
+Any questions or blockages, leave a comment on the Linear issue and put the issue into the appropriate Blocked status.
 
 Prefer smaller, focused commits that are easier to digest.
 
