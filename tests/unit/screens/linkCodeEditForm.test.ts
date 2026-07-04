@@ -38,12 +38,35 @@ const rawContentLinkCode: LinkCodeSummary = {
 describe('Link Code edit form', () => {
   it('creates editable state from a redirect Link Code', () => {
     expect(createLinkCodeEditFormState(redirectLinkCode)).toEqual(expect.objectContaining({
+      canEditCustomLinkCode: false,
       code: 'abc123',
       displayName: 'Launch page',
       id: 'link-code-id',
       redirectUrl: 'https://example.com/launch',
       responseMode: 'redirect'
     }))
+  })
+
+  it('tracks custom code changes for premium edit forms', () => {
+    const form = updateLinkCodeEditFormField(
+      createLinkCodeEditFormState(redirectLinkCode, true),
+      'code',
+      ' go '
+    )
+
+    expect(linkCodeEditFormToUpdateParams(form)).toEqual(expect.objectContaining({
+      code: 'go'
+    }))
+  })
+
+  it('omits custom code from non-premium edit params', () => {
+    const form = updateLinkCodeEditFormField(
+      createLinkCodeEditFormState(redirectLinkCode),
+      'code',
+      'go'
+    )
+
+    expect(linkCodeEditFormToUpdateParams(form)).not.toHaveProperty('code')
   })
 
   it('creates normalized update params after field changes', () => {

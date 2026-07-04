@@ -1,3 +1,5 @@
+import { LinkCodeCodeValidationError, normalizeLinkCodeCode } from './linkCodeCodes.ts'
+
 export const defaultRawContentType = 'text/plain; charset=utf-8'
 export const defaultRawStatusCode = 200
 export const maximumHttpStatusCode = 599
@@ -18,6 +20,7 @@ type RawContentResponseConfig = {
 type ResponseConfig = RedirectResponseConfig | RawContentResponseConfig
 
 type LinkCodeDetailsParams = {
+  code?: string
   displayName: string
   id: string
   responseConfig: ResponseConfig
@@ -94,7 +97,24 @@ const normalizeResponseConfig = (responseConfig: ResponseConfig): ResponseConfig
   } satisfies RawContentResponseConfig
 }
 
+const normalizeOptionalLinkCodeCode = (code?: string) => {
+  if (code === undefined) {
+    return undefined
+  }
+
+  try {
+    return normalizeLinkCodeCode(code)
+  } catch (error) {
+    if (error instanceof LinkCodeCodeValidationError) {
+      throw validationError(error.message)
+    }
+
+    throw error
+  }
+}
+
 export const normalizeLinkCodeDetails = ({
+  code,
   displayName,
   id,
   responseConfig
@@ -110,7 +130,10 @@ export const normalizeLinkCodeDetails = ({
     throw validationError('Enter a Link Code name.')
   }
 
+  const normalizedCode = normalizeOptionalLinkCodeCode(code)
+
   return {
+    ...(normalizedCode === undefined ? {} : { code: normalizedCode }),
     displayName: normalizedDisplayName,
     id: normalizedId,
     responseConfig: normalizeResponseConfig(responseConfig)

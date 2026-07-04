@@ -111,10 +111,13 @@ export const useHomeScreenViewModel = () => {
   }, [deleteConfirmation.target, linkCodes.deleteLinkCode])
 
   const openEditLinkCode = useCallback((linkCode: LinkCodeSummary) => {
-    setEditForm(createLinkCodeEditFormState(linkCode))
+    setEditForm(createLinkCodeEditFormState(
+      linkCode,
+      linkCodes.linkCodeCapabilities.canEditCustomLinkCodes
+    ))
     setEditValidationError(undefined)
     clearEditError()
-  }, [clearEditError])
+  }, [clearEditError, linkCodes.linkCodeCapabilities.canEditCustomLinkCodes])
 
   const closeEditLinkCode = useCallback(() => {
     setEditForm(undefined)

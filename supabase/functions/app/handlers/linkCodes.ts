@@ -51,10 +51,14 @@ const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsPara
     throw new HttpError(400, 'Link Code details are required.')
   }
 
-  const { displayName, id, responseConfig } = params
+  const { code, displayName, id, responseConfig } = params
 
   if (typeof id !== 'string' || typeof displayName !== 'string' || !isRecord(responseConfig)) {
     throw new HttpError(400, 'Link Code details are required.')
+  }
+
+  if (code !== undefined && typeof code !== 'string') {
+    throw new HttpError(400, 'Link Code must be text.')
   }
 
   if (responseConfig.mode === 'redirect') {
@@ -63,6 +67,7 @@ const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsPara
     }
 
     return {
+      ...(code === undefined ? {} : { code }),
       displayName,
       id,
       responseConfig: {
@@ -84,6 +89,7 @@ const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsPara
     }
 
     return {
+      ...(code === undefined ? {} : { code }),
       displayName,
       id,
       responseConfig: {

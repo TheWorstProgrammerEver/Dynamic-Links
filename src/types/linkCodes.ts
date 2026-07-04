@@ -1,6 +1,8 @@
 export type {
+  CreateLinkCodeParams,
   DeletedLinkCode,
   DeleteLinkCodeParams,
+  LinkCodeCapabilities,
   LinkCodeRawContentResponseConfig,
   LinkCodeRedirectResponseConfig,
   LinkCodeResponseConfig,

@@ -26,7 +26,12 @@ export type LinkCodeSummary = {
   createdDate: string
 }
 
+export type LinkCodeCapabilities = {
+  canEditCustomLinkCodes: boolean
+}
+
 export type LinkCodesState = {
+  capabilities: LinkCodeCapabilities
   linkCodes: LinkCodeSummary[]
 }
 
@@ -48,6 +53,7 @@ export type DeletedLinkCode = {
 }
 
 export type UpdateLinkCodeDetailsParams = {
+  code?: string
   displayName: string
   id: string
   responseConfig: LinkCodeResponseConfig

@@ -3,6 +3,7 @@ import {
   LinkCodeDetailsValidationError,
   normalizeLinkCodeDetails
 } from '../../../common/linkCodeDetails.ts'
+import { isLinkCodeCodeConflictError } from '../../../common/linkCodeCodes.ts'
 import type {
   CreateLinkCodeParams,
   DeleteLinkCodeParams,
@@ -30,18 +31,7 @@ const linkCodeFields = [
   'created_date'
 ].join(', ')
 
-const isLinkCodeCollision = (error: unknown) => {
-  if (!error || typeof error !== 'object') {
-    return false
-  }
-
-  const candidate = error as { code?: unknown; details?: unknown; message?: unknown }
-  const message = [candidate.message, candidate.details]
-    .filter((part): part is string => typeof part === 'string')
-    .join(' ')
-
-  return candidate.code === '23505' && /link_codes_code_key|code|duplicate key/i.test(message)
-}
+const customLinkCodeConflict = () => new HttpError(409, 'That Link Code is already in use.')
 
 const insertOwnedLinkCode = async (
   client: SupabaseClient,
@@ -70,17 +60,80 @@ const insertOwnedLinkCode = async (
 }
 
 export const loadOwnedLinkCodes = async (client: SupabaseClient, ownerUserId: string) => {
-  const rows = await selectRows<LinkCodeRow>(
-    client
-      .from('link_codes')
-      .select(linkCodeFields)
-      .eq('owner_user_id', ownerUserId)
-      .order('created_date', { ascending: false })
-      .order('display_name', { ascending: true })
-  )
+  const [rows, canEditCustomLinkCodes] = await Promise.all([
+    selectRows<LinkCodeRow>(
+      client
+        .from('link_codes')
+        .select(linkCodeFields)
+        .eq('owner_user_id', ownerUserId)
+        .order('created_date', { ascending: false })
+        .order('display_name', { ascending: true })
+    ),
+    loadCurrentUserCanEditCustomLinkCodes(client)
+  ])
 
   return {
+    capabilities: {
+      canEditCustomLinkCodes
+    },
     linkCodes: rows.map(linkCodeFromRow)
+  }
+}
+
+const loadCurrentUserCanEditCustomLinkCodes = async (client: SupabaseClient) => {
+  const { data, error } = await client.rpc('current_user_can_edit_custom_link_codes')
+
+  if (error) {
+    throw error
+  }
+
+  return Boolean(data)
+}
+
+const assertCurrentUserCanEditCustomLinkCodes = async (client: SupabaseClient) => {
+  if (!await loadCurrentUserCanEditCustomLinkCodes(client)) {
+    throw new HttpError(403, 'Premium is required to edit custom Link Codes.')
+  }
+}
+
+const assertLinkCodeCodeAvailable = async (
+  client: SupabaseClient,
+  id: string,
+  code: string
+) => {
+  const rows = await selectRows<{ id: string }>(
+    client
+      .from('link_codes')
+      .select('id')
+      .eq('code', code)
+      .neq('id', id)
+      .limit(1)
+  )
+
+  if (rows.length > 0) {
+    throw customLinkCodeConflict()
+  }
+}
+
+const updateOwnedLinkCodeCode = async (
+  client: SupabaseClient,
+  id: string,
+  code: string
+) => {
+  await assertCurrentUserCanEditCustomLinkCodes(client)
+  await assertLinkCodeCodeAvailable(client, id, code)
+
+  const { error } = await client.rpc('update_owned_link_code_code', {
+    target_code: code,
+    target_link_code_id: id
+  })
+
+  if (isLinkCodeCodeConflictError(error)) {
+    throw customLinkCodeConflict()
+  }
+
+  if (error) {
+    throw error
   }
 }
 
@@ -93,7 +146,7 @@ export const createOwnedLinkCode = async (
     return await createLinkCodeWithRandomCode({
       displayName: params.displayName,
       insert: (attempt) => insertOwnedLinkCode(client, ownerUserId, attempt),
-      isCodeCollisionError: isLinkCodeCollision
+      isCodeCollisionError: isLinkCodeCodeConflictError
     })
   } catch (error) {
     if (error instanceof LinkCodeValidationError) {
@@ -140,6 +193,11 @@ export const updateOwnedLinkCodeDetails = async (
   try {
     const details = normalizeLinkCodeDetails(params)
     const responseConfig = details.responseConfig
+
+    if (details.code !== undefined) {
+      await updateOwnedLinkCodeCode(client, details.id, details.code)
+    }
+
     const update = responseConfig.mode === 'redirect'
       ? {
         display_name: details.displayName,
@@ -177,6 +235,10 @@ export const updateOwnedLinkCodeDetails = async (
   } catch (error) {
     if (error instanceof LinkCodeDetailsValidationError) {
       throw new HttpError(400, error.message)
+    }
+
+    if (isLinkCodeCodeConflictError(error)) {
+      throw customLinkCodeConflict()
     }
 
     throw error
