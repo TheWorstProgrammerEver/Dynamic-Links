@@ -89,6 +89,12 @@ test('creates an account, signs out, and signs back in', async ({ page }) => {
   await expect(page.getByText('No Link Codes yet')).toBeVisible()
   await expect(page.getByRole('link', { name: `Open profile for ${email}` })).toBeVisible()
 
+  await page.getByLabel('Name', { exact: true }).fill('Launch page')
+  await page.getByRole('button', { name: 'Create Link Code' }).click()
+  await expect(page.getByText('Launch page')).toBeVisible()
+  await expect(page.locator('code').filter({ hasText: /^[23456789abcdefghijkmnpqrstuvwxyz]{8,}$/ })).toBeVisible()
+  await expect(page.getByText('No Link Codes yet')).not.toBeVisible()
+
   await page.getByRole('link', { name: `Open profile for ${email}` }).click()
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
   await page.getByRole('button', { name: 'Log out' }).click()
@@ -102,4 +108,7 @@ test('creates an account, signs out, and signs back in', async ({ page }) => {
 
   await expect(page).toHaveURL('/profile')
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
+
+  await page.getByRole('link', { name: 'Home' }).click()
+  await expect(page.getByText('Launch page')).toBeVisible()
 })

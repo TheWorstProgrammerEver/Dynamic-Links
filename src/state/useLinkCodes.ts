@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLoader } from '../../lib/hooks/useLoader'
 import { appDispatcher } from '../data/app/appDispatcher'
-import { LoadLinkCodesQuery } from '../data/app/requests'
+import { CreateLinkCodeCommand, LoadLinkCodesQuery } from '../data/app/requests'
 import type { Account } from '../types/auth'
-import type { LinkCodesState } from '../types/linkCodes'
+import type { LinkCodesState, LinkCodeSummary } from '../types/linkCodes'
 
 const emptyState: LinkCodesState = {
   linkCodes: []
@@ -13,13 +13,31 @@ const errorMessage = (error: unknown) => (
   error instanceof Error ? error.message : 'Link Code request failed.'
 )
 
+const addCreatedLinkCode = (state: LinkCodesState, linkCode: LinkCodeSummary): LinkCodesState => ({
+  ...state,
+  linkCodes: [
+    linkCode,
+    ...state.linkCodes.filter((existingLinkCode) => existingLinkCode.id !== linkCode.id)
+  ]
+})
+
 export const useLinkCodes = (currentAccount?: Account) => {
   const [state, setState] = useState<LinkCodesState>(emptyState)
   const linkCodesLoad = useLoader({ getErrorMessage: errorMessage })
+  const createLinkCodeLoad = useLoader({ getErrorMessage: errorMessage })
   const linkCodesLoadState = useMemo(() => ({
     ...linkCodesLoad,
     busy: Boolean(currentAccount) && (!linkCodesLoad.settled || linkCodesLoad.busy)
   }), [currentAccount, linkCodesLoad])
+
+  const createLinkCode = useCallback(async (displayName: string) => {
+    const linkCode = await createLinkCodeLoad.execute(() => (
+      appDispatcher.dispatch(new CreateLinkCodeCommand({ displayName }))
+    ))
+    setState((currentState) => addCreatedLinkCode(currentState, linkCode))
+
+    return linkCode
+  }, [createLinkCodeLoad.execute])
 
   const reloadLinkCodes = useCallback(async () => {
     try {
@@ -39,6 +57,7 @@ export const useLinkCodes = (currentAccount?: Account) => {
 
     if (!currentAccount) {
       setState(emptyState)
+      createLinkCodeLoad.clearError()
       linkCodesLoad.clearError()
 
       return () => {
@@ -61,9 +80,11 @@ export const useLinkCodes = (currentAccount?: Account) => {
     return () => {
       active = false
     }
-  }, [currentAccount, linkCodesLoad.clearError, linkCodesLoad.execute])
+  }, [createLinkCodeLoad.clearError, currentAccount, linkCodesLoad.clearError, linkCodesLoad.execute])
 
   return {
+    createLinkCode,
+    createLinkCodeLoad,
     linkCodes: state.linkCodes,
     linkCodesLoad: linkCodesLoadState,
     reloadLinkCodes,
