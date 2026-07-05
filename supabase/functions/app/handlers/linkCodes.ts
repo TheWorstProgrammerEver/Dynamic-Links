@@ -85,14 +85,10 @@ const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsPara
   }
 
   if (responseConfig.mode === 'raw_content') {
-    const { content, contentType, statusCode } = responseConfig
+    const { responseMessage } = responseConfig
 
-    if (
-      typeof content !== 'string'
-      || typeof contentType !== 'string'
-      || typeof statusCode !== 'number'
-    ) {
-      throw new HttpError(400, 'Raw content response details are required.')
+    if (typeof responseMessage !== 'string') {
+      throw new HttpError(400, 'Raw response message is required.')
     }
 
     return {
@@ -100,10 +96,8 @@ const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsPara
       displayName,
       id,
       responseConfig: {
-        content,
-        contentType,
         mode: 'raw_content',
-        statusCode
+        responseMessage
       } satisfies LinkCodeResponseConfig,
       status
     }

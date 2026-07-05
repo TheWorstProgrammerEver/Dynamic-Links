@@ -1,11 +1,6 @@
 import { LinkCodeCodeValidationError, normalizeLinkCodeCode } from './linkCodeCodes.ts'
 import { isLinkCodeStatus, type LinkCodeStatus } from './linkCodeTypes.ts'
-
-export const defaultRawContentType = 'text/plain; charset=utf-8'
-export const defaultRawStatusCode = 200
-export const maximumHttpStatusCode = 599
-export const minimumHttpStatusCode = 200
-const bodylessRawStatusCodes = new Set([204, 205, 304])
+import { normalizeRawResponseMessage, RawResponseMessageValidationError } from './rawHttpResponse.ts'
 
 type RedirectResponseConfig = {
   mode: 'redirect'
@@ -13,10 +8,8 @@ type RedirectResponseConfig = {
 }
 
 type RawContentResponseConfig = {
-  content: string
-  contentType: string
   mode: 'raw_content'
-  statusCode: number
+  responseMessage: string
 }
 
 type ResponseConfig = RedirectResponseConfig | RawContentResponseConfig
@@ -66,29 +59,6 @@ export const normalizeRedirectUrl = (redirectUrl: string) => {
   return parsedUrl.href
 }
 
-export const normalizeRawContentType = (contentType: string) => {
-  const normalizedContentType = contentType.trim() || defaultRawContentType
-
-  if (/[\r\n]/.test(normalizedContentType)) {
-    throw validationError('Content type cannot contain line breaks.')
-  }
-
-  return normalizedContentType
-}
-
-export const normalizeRawStatusCode = (statusCode: number) => {
-  if (
-    !Number.isInteger(statusCode)
-    || statusCode < minimumHttpStatusCode
-    || statusCode > maximumHttpStatusCode
-    || bodylessRawStatusCodes.has(statusCode)
-  ) {
-    throw validationError('Status code must be an integer from 200 to 599 that allows a response body.')
-  }
-
-  return statusCode
-}
-
 const normalizeResponseConfig = (responseConfig: ResponseConfig): ResponseConfig => {
   if (responseConfig.mode === 'redirect') {
     return {
@@ -97,12 +67,18 @@ const normalizeResponseConfig = (responseConfig: ResponseConfig): ResponseConfig
     } satisfies RedirectResponseConfig
   }
 
-  return {
-    content: responseConfig.content,
-    contentType: normalizeRawContentType(responseConfig.contentType),
-    mode: 'raw_content',
-    statusCode: normalizeRawStatusCode(responseConfig.statusCode)
-  } satisfies RawContentResponseConfig
+  try {
+    return {
+      mode: 'raw_content',
+      responseMessage: normalizeRawResponseMessage(responseConfig.responseMessage)
+    } satisfies RawContentResponseConfig
+  } catch (error) {
+    if (error instanceof RawResponseMessageValidationError) {
+      throw validationError(error.message)
+    }
+
+    throw error
+  }
 }
 
 const normalizeOptionalLinkCodeCode = (code?: string) => {

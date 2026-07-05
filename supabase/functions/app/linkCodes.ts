@@ -24,9 +24,7 @@ const linkCodeFields = [
   'code',
   'response_mode',
   'redirect_url',
-  'raw_content',
-  'raw_content_type',
-  'raw_status_code',
+  'raw_response_message',
   'status',
   'created_date'
 ].join(', ')
@@ -201,7 +199,7 @@ export const updateOwnedLinkCodeDetails = async (
     const update = responseConfig.mode === 'redirect'
       ? {
         display_name: details.displayName,
-        raw_content: null,
+        raw_response_message: null,
         redirect_url: responseConfig.redirectUrl,
         response_mode: responseConfig.mode,
         status: details.status,
@@ -209,9 +207,7 @@ export const updateOwnedLinkCodeDetails = async (
       }
       : {
         display_name: details.displayName,
-        raw_content: responseConfig.content,
-        raw_content_type: responseConfig.contentType,
-        raw_status_code: responseConfig.statusCode,
+        raw_response_message: responseConfig.responseMessage,
         redirect_url: null,
         response_mode: responseConfig.mode,
         status: details.status,

@@ -32,9 +32,7 @@ type LinkCodeRow = {
   display_name: string
   id: string
   owner_user_id: string
-  raw_content: string | null
-  raw_content_type: string | null
-  raw_status_code: number | null
+  raw_response_message: string | null
   redirect_url: string | null
   response_mode: string
   status: string
@@ -80,7 +78,7 @@ const invokeApp = (client: SupabaseClient, identifier: string, params: unknown =
 const selectLinkCodes = async (client: SupabaseClient) => {
   const { data, error } = await client
     .from('link_codes')
-    .select('id, owner_user_id, display_name, code, redirect_url, raw_content, raw_content_type, raw_status_code, response_mode, status')
+    .select('id, owner_user_id, display_name, code, redirect_url, raw_response_message, response_mode, status')
     .order('display_name', { ascending: true })
 
   if (error) {
@@ -109,9 +107,7 @@ const insertLinkCode = async ({
   code,
   displayName,
   ownerUserId,
-  rawContent = null,
-  rawContentType,
-  rawStatusCode,
+  rawResponseMessage = null,
   redirectUrl = null,
   responseMode = 'redirect',
   status = 'active'
@@ -119,9 +115,7 @@ const insertLinkCode = async ({
   code: string
   displayName: string
   ownerUserId: string
-  rawContent?: string | null
-  rawContentType?: string
-  rawStatusCode?: number
+  rawResponseMessage?: string | null
   redirectUrl?: string | null
   responseMode?: string
   status?: string
@@ -130,9 +124,7 @@ const insertLinkCode = async ({
     code: string
     display_name: string
     owner_user_id: string
-    raw_content: string | null
-    raw_content_type?: string
-    raw_status_code?: number
+    raw_response_message: string | null
     redirect_url: string | null
     response_mode: string
     status: string
@@ -140,18 +132,10 @@ const insertLinkCode = async ({
     owner_user_id: ownerUserId,
     display_name: displayName,
     code,
-    raw_content: rawContent,
+    raw_response_message: rawResponseMessage,
     redirect_url: redirectUrl,
     response_mode: responseMode,
     status
-  }
-
-  if (rawContentType !== undefined) {
-    row.raw_content_type = rawContentType
-  }
-
-  if (rawStatusCode !== undefined) {
-    row.raw_status_code = rawStatusCode
   }
 
   const { data, error } = await createAdminClient()
@@ -328,7 +312,7 @@ describe('app security integration', () => {
         ownerUserId: securityFixture.users.owner.id,
         displayName: `${securityFixture.prefix} unconfigured content Link Code`,
         code: `${securityFixture.prefix}-content-unconfigured`,
-        rawContent: null,
+        rawResponseMessage: null,
         responseMode: 'raw_content'
       })
 
@@ -354,9 +338,14 @@ describe('app security integration', () => {
         ownerUserId: securityFixture.users.owner.id,
         displayName: `${securityFixture.prefix} public content Link Code`,
         code: `${securityFixture.prefix}-content`,
-        rawContent: '<h1>Public content</h1>',
-        rawContentType: 'text/html; charset=utf-8',
-        rawStatusCode: 203,
+        rawResponseMessage: [
+          'HTTP/1.1 203 Non-Authoritative Information',
+          'Content-Type: text/html; charset=utf-8',
+          'Content-Length: 23',
+          'X-Link-Code-Test: configured',
+          '',
+          '<h1>Public content</h1>'
+        ].join('\n'),
         responseMode: 'raw_content'
       })
 
@@ -365,7 +354,8 @@ describe('app security integration', () => {
 
       expect(response.status).toBe(203)
       expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8')
-      expect(response.headers.get('cache-control')).toContain('no-store')
+      expect(response.headers.get('x-link-code-test')).toBe('configured')
+      expect(response.headers.get('cache-control')).toBeNull()
       expect(response.headers.get('location')).toBeNull()
       expect(body).toBe('<h1>Public content</h1>')
       expect(body).not.toContain(securityFixture.users.owner.id)
@@ -375,7 +365,7 @@ describe('app security integration', () => {
     }
   })
 
-  test('content-mode Link Codes use default response metadata when optional metadata is absent', async () => {
+  test('content-mode Link Codes serve the default raw response message', async () => {
     const securityFixture = requireFixture()
     let createdId: string | undefined
 
@@ -384,7 +374,7 @@ describe('app security integration', () => {
         ownerUserId: securityFixture.users.owner.id,
         displayName: `${securityFixture.prefix} default content metadata Link Code`,
         code: `${securityFixture.prefix}-content-defaults`,
-        rawContent: 'default public content',
+        rawResponseMessage: 'HTTP/1.1 200 OK\nContent-Type: text/plain; charset=utf-8\n\ndefault public content',
         responseMode: 'raw_content'
       })
 
@@ -409,7 +399,7 @@ describe('app security integration', () => {
         ownerUserId: securityFixture.users.owner.id,
         displayName: `${securityFixture.prefix} stale content redirect Link Code`,
         code: `${securityFixture.prefix}-redirect-stale-content`,
-        rawContent: 'stale public content',
+        rawResponseMessage: 'HTTP/1.1 200 OK\nContent-Type: text/plain\n\nstale public content',
         redirectUrl: 'https://example.com/stale-content',
         responseMode: 'redirect'
       })
@@ -537,7 +527,7 @@ describe('app security integration', () => {
         ownerUserId: securityFixture.users.owner.id,
         displayName: `${securityFixture.prefix} mutable content Link Code`,
         code,
-        rawContent: 'first content',
+        rawResponseMessage: 'HTTP/1.1 200 OK\nContent-Type: text/plain; charset=utf-8\n\nfirst content',
         responseMode: 'raw_content'
       })
 
@@ -550,10 +540,8 @@ describe('app security integration', () => {
         displayName: `${securityFixture.prefix} mutable content Link Code`,
         id: createdId,
         responseConfig: {
-          content: '{"message":"second content"}',
-          contentType: 'application/json; charset=utf-8',
           mode: 'raw_content',
-          statusCode: 202
+          responseMessage: 'HTTP/1.1 202 Accepted\nContent-Type: application/json; charset=utf-8\n\n{"message":"second content"}'
         },
         status: 'active'
       })
@@ -562,10 +550,8 @@ describe('app security integration', () => {
       expect(data).toEqual(expect.objectContaining({
         code,
         responseConfig: {
-          content: '{"message":"second content"}',
-          contentType: 'application/json; charset=utf-8',
           mode: 'raw_content',
-          statusCode: 202
+          responseMessage: 'HTTP/1.1 202 Accepted\nContent-Type: application/json; charset=utf-8\n\n{"message":"second content"}'
         }
       }))
       expect(createPublicLinkCodePath(code)).toBe(publicPath)
@@ -829,10 +815,8 @@ describe('app security integration', () => {
         displayName: ` ${securityFixture.prefix} updated content `,
         id: createdId,
         responseConfig: {
-          content: 'Updated content',
-          contentType: 'text/html; charset=utf-8',
           mode: 'raw_content',
-          statusCode: 202
+          responseMessage: 'HTTP/1.1 202 Accepted\nContent-Type: text/html; charset=utf-8\n\nUpdated content'
         },
         status: 'active'
       })
@@ -842,10 +826,8 @@ describe('app security integration', () => {
         displayName: `${securityFixture.prefix} updated content`,
         id: createdId,
         responseConfig: {
-          content: 'Updated content',
-          contentType: 'text/html; charset=utf-8',
           mode: 'raw_content',
-          statusCode: 202
+          responseMessage: 'HTTP/1.1 202 Accepted\nContent-Type: text/html; charset=utf-8\n\nUpdated content'
         },
         responseMode: 'raw_content',
         status: 'active'
@@ -853,16 +835,14 @@ describe('app security integration', () => {
 
       const { data: row, error: rowError } = await createAdminClient()
         .from('link_codes')
-        .select('display_name, redirect_url, raw_content, raw_content_type, raw_status_code, response_mode, status')
+        .select('display_name, redirect_url, raw_response_message, response_mode, status')
         .eq('id', createdId)
         .single()
 
       expect(rowError).toBeFalsy()
       expect(row).toEqual({
         display_name: `${securityFixture.prefix} updated content`,
-        raw_content: 'Updated content',
-        raw_content_type: 'text/html; charset=utf-8',
-        raw_status_code: 202,
+        raw_response_message: 'HTTP/1.1 202 Accepted\nContent-Type: text/html; charset=utf-8\n\nUpdated content',
         redirect_url: null,
         response_mode: 'raw_content',
         status: 'active'
@@ -964,10 +944,8 @@ describe('app security integration', () => {
       displayName: `${securityFixture.prefix} non-premium custom code`,
       id: securityFixture.linkCodes.hidden,
       responseConfig: {
-        content: 'hidden content',
-        contentType: 'text/plain; charset=utf-8',
         mode: 'raw_content',
-        statusCode: 200
+        responseMessage: 'HTTP/1.1 200 OK\nContent-Type: text/plain; charset=utf-8\n\nhidden content'
       },
       status: 'draft'
     })
@@ -1063,36 +1041,32 @@ describe('app security integration', () => {
     expect(row?.redirect_url).toBe('https://example.com/visible')
   })
 
-  test('Link Code owners cannot directly store raw content statuses that cannot carry bodies', async () => {
+  test('Link Code updates reject invalid raw response messages through the app function', async () => {
     const securityFixture = requireFixture()
-    const informationalStatusUpdate = await ownerClient
-      .from('link_codes')
-      .update({
-        raw_status_code: 199
-      })
-      .eq('id', securityFixture.linkCodes.visible)
-      .select('id')
+    const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+      displayName: `${securityFixture.prefix} invalid raw response`,
+      id: securityFixture.linkCodes.visible,
+      responseConfig: {
+        mode: 'raw_content',
+        responseMessage: 'HTTP/1.1 200 OK\nBad header\n\nHello'
+      },
+      status: 'active'
+    })
 
-    expect(informationalStatusUpdate.error).toBeTruthy()
-
-    const bodylessStatusUpdate = await ownerClient
-      .from('link_codes')
-      .update({
-        raw_status_code: 204
-      })
-      .eq('id', securityFixture.linkCodes.visible)
-      .select('id')
-
-    expect(bodylessStatusUpdate.error).toBeTruthy()
+    expect(error).toBeTruthy()
+    expect(data).toBeFalsy()
 
     const { data: row, error: rowError } = await createAdminClient()
       .from('link_codes')
-      .select('raw_status_code')
+      .select('raw_response_message, response_mode')
       .eq('id', securityFixture.linkCodes.visible)
       .single()
 
     expect(rowError).toBeFalsy()
-    expect(row?.raw_status_code).toBe(200)
+    expect(row).toEqual({
+      raw_response_message: null,
+      response_mode: 'redirect'
+    })
   })
 
   test('Link Code owners cannot update another owner row through the app function', async () => {

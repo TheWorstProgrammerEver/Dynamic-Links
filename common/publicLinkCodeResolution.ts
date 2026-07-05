@@ -1,17 +1,12 @@
 import {
-  defaultRawContentType,
-  defaultRawStatusCode,
   LinkCodeDetailsValidationError,
-  normalizeRawContentType,
-  normalizeRawStatusCode,
   normalizeRedirectUrl
 } from './linkCodeDetails.ts'
+import { parseRawResponseMessage, RawResponseMessageValidationError } from './rawHttpResponse.ts'
 import type { LinkCodeResponseMode, LinkCodeStatus } from './linkCodeTypes.ts'
 
 export type PublicLinkCodeResolverRow = {
-  raw_content: string | null
-  raw_content_type?: string | null
-  raw_status_code?: number | null
+  raw_response_message: string | null
   redirect_url: string | null
   response_mode: LinkCodeResponseMode
   status: LinkCodeStatus
@@ -24,9 +19,10 @@ export type PublicLinkCodeResolution =
   }
   | {
     body: string
-    contentType: string
+    headers: [string, string][]
     responseMode: 'raw_content'
-    statusCode: number
+    status: number
+    statusText: string
   }
 
 const defaultOnStoredValidationError = <T>(readValue: () => T, defaultValue: T) => {
@@ -52,23 +48,21 @@ const normalizeStoredRedirectUrl = (redirectUrl: string | null) => {
   )
 }
 
-const normalizeStoredRawContentType = (contentType: string | null | undefined) => (
-  contentType === null || contentType === undefined
-    ? defaultRawContentType
-    : defaultOnStoredValidationError(
-      () => normalizeRawContentType(contentType),
-      defaultRawContentType
-    )
-)
+const parseStoredRawResponseMessage = (message: string | null) => {
+  if (message === null) {
+    return undefined
+  }
 
-const normalizeStoredRawStatusCode = (statusCode: number | null | undefined) => (
-  statusCode === null || statusCode === undefined
-    ? defaultRawStatusCode
-    : defaultOnStoredValidationError(
-      () => normalizeRawStatusCode(statusCode),
-      defaultRawStatusCode
-    )
-)
+  try {
+    return parseRawResponseMessage(message)
+  } catch (error) {
+    if (error instanceof RawResponseMessageValidationError) {
+      return undefined
+    }
+
+    throw error
+  }
+}
 
 export const resolvePublicLinkCodeRow = (
   row: PublicLinkCodeResolverRow
@@ -88,12 +82,15 @@ export const resolvePublicLinkCodeRow = (
       : undefined
   }
 
-  return row.raw_content === null
+  const rawResponse = parseStoredRawResponseMessage(row.raw_response_message)
+
+  return rawResponse === undefined
     ? undefined
     : {
-      body: row.raw_content,
-      contentType: normalizeStoredRawContentType(row.raw_content_type),
+      body: rawResponse.body,
+      headers: rawResponse.headers,
       responseMode: row.response_mode,
-      statusCode: normalizeStoredRawStatusCode(row.raw_status_code)
+      status: rawResponse.status,
+      statusText: rawResponse.statusText
     }
 }

@@ -26,10 +26,8 @@ const rawContentLinkCode: LinkCodeSummary = {
   displayName: 'Content page',
   id: 'raw-link-code-id',
   responseConfig: {
-    content: 'Hello',
-    contentType: 'text/html; charset=utf-8',
     mode: 'raw_content',
-    statusCode: 201
+    responseMessage: 'HTTP/1.1 201 Created\nContent-Type: text/html; charset=utf-8\n\nHello'
   },
   responseMode: 'raw_content',
   status: 'active'
@@ -84,21 +82,19 @@ describe('Link Code edit form', () => {
     const form = updateLinkCodeEditFormField(
       updateLinkCodeEditFormField(
         updateLinkCodeEditFormField(createLinkCodeEditFormState(redirectLinkCode), 'responseMode', 'raw_content'),
-        'rawContent',
-        'Updated'
+        'rawResponseMessage',
+        'HTTP/1.1 202 Accepted\nContent-Type: text/plain; charset=utf-8\n\nUpdated'
       ),
-      'rawStatusCode',
-      '202'
+      'displayName',
+      'Updated launch page'
     )
 
     expect(linkCodeEditFormToUpdateParams(form)).toEqual({
-      displayName: 'Launch page',
+      displayName: 'Updated launch page',
       id: 'link-code-id',
       responseConfig: {
-        content: 'Updated',
-        contentType: 'text/plain; charset=utf-8',
         mode: 'raw_content',
-        statusCode: 202
+        responseMessage: 'HTTP/1.1 202 Accepted\nContent-Type: text/plain; charset=utf-8\n\nUpdated'
       },
       status: 'draft'
     })

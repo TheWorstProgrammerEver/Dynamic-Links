@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  defaultRawContentType,
   LinkCodeDetailsValidationError,
   normalizeLinkCodeDetails
 } from '../../../common/linkCodeDetails'
@@ -107,39 +106,33 @@ describe('Link Code details', () => {
     })).toThrow(/Draft, Active, or Disabled/)
   })
 
-  it('normalizes raw content metadata', () => {
+  it('validates raw response messages', () => {
     expect(normalizeLinkCodeDetails({
       displayName: 'Content page',
       id: 'link-code-id',
       responseConfig: {
-        content: 'Hello',
-        contentType: ' ',
         mode: 'raw_content',
-        statusCode: 202
+        responseMessage: 'HTTP/1.1 202 Accepted\nContent-Type: text/plain\n\nHello'
       },
       status: 'disabled'
     })).toEqual({
       displayName: 'Content page',
       id: 'link-code-id',
       responseConfig: {
-        content: 'Hello',
-        contentType: defaultRawContentType,
         mode: 'raw_content',
-        statusCode: 202
+        responseMessage: 'HTTP/1.1 202 Accepted\nContent-Type: text/plain\n\nHello'
       },
       status: 'disabled'
     })
   })
 
-  it('validates raw content HTTP metadata', () => {
+  it('rejects invalid raw response messages', () => {
     expect(() => normalizeLinkCodeDetails({
       displayName: 'Content page',
       id: 'link-code-id',
       responseConfig: {
-        content: 'Hello',
-        contentType: 'text/plain',
         mode: 'raw_content',
-        statusCode: 199
+        responseMessage: 'HTTP/1.1 199 Early\nContent-Type: text/plain\n\nHello'
       },
       status: 'draft'
     })).toThrow(/200 to 599/)
@@ -148,24 +141,20 @@ describe('Link Code details', () => {
       displayName: 'Content page',
       id: 'link-code-id',
       responseConfig: {
-        content: 'Hello',
-        contentType: 'text/plain',
         mode: 'raw_content',
-        statusCode: 204
+        responseMessage: 'HTTP/1.1 204 No Content\nContent-Type: text/plain\n\nHello'
       },
       status: 'draft'
-    })).toThrow(/response body/)
+    })).toThrow(/must be empty/)
 
     expect(() => normalizeLinkCodeDetails({
       displayName: 'Content page',
       id: 'link-code-id',
       responseConfig: {
-        content: 'Hello',
-        contentType: 'text/plain\r\nx-extra: value',
         mode: 'raw_content',
-        statusCode: 200
+        responseMessage: 'HTTP/1.1 200 OK\nBad header\n\nHello'
       },
       status: 'draft'
-    })).toThrow(/line breaks/)
+    })).toThrow(/Name: value/)
   })
 })

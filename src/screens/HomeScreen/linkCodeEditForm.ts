@@ -1,8 +1,5 @@
-import {
-  defaultRawContentType,
-  defaultRawStatusCode,
-  normalizeLinkCodeDetails
-} from '../../../common/linkCodeDetails'
+import { normalizeLinkCodeDetails } from '../../../common/linkCodeDetails'
+import { defaultRawResponseMessage, parseRawResponseMessage } from '../../../common/rawHttpResponse'
 import type {
   LinkCodeResponseMode,
   LinkCodeStatus,
@@ -15,9 +12,7 @@ export type LinkCodeEditFormState = {
   code: string
   displayName: string
   id: string
-  rawContent: string
-  rawContentType: string
-  rawStatusCode: string
+  rawResponseMessage: string
   redirectUrl: string
   responseMode: LinkCodeResponseMode
   status: LinkCodeStatus
@@ -37,9 +32,7 @@ export const createLinkCodeEditFormState = (
     code: linkCode.code,
     displayName: linkCode.displayName,
     id: linkCode.id,
-    rawContent: rawContentConfig?.content ?? '',
-    rawContentType: rawContentConfig?.contentType ?? defaultRawContentType,
-    rawStatusCode: String(rawContentConfig?.statusCode ?? defaultRawStatusCode),
+    rawResponseMessage: rawContentConfig?.responseMessage ?? defaultRawResponseMessage,
     redirectUrl: redirectConfig?.redirectUrl ?? '',
     responseMode: linkCode.responseMode,
     status: linkCode.status
@@ -83,10 +76,8 @@ export const linkCodeEditFormToUpdateParams = (
       redirectUrl: form.redirectUrl
     }
     : {
-      content: form.rawContent,
-      contentType: form.rawContentType,
       mode: 'raw_content',
-      statusCode: Number(form.rawStatusCode)
+      responseMessage: form.rawResponseMessage
     },
   status: form.status
 })
@@ -96,5 +87,12 @@ export const formatLinkCodeResponseConfig = (linkCode: LinkCodeSummary) => {
     return linkCode.responseConfig.redirectUrl || 'Redirect URL not set'
   }
 
-  return `${linkCode.responseConfig.statusCode} ${linkCode.responseConfig.contentType}`
+  try {
+    const response = parseRawResponseMessage(linkCode.responseConfig.responseMessage)
+    const contentType = response.headers.find(([name]) => name.toLowerCase() === 'content-type')?.[1]
+
+    return contentType ? `${response.status} ${contentType}` : `${response.status} raw response`
+  } catch {
+    return 'Raw response message'
+  }
 }
