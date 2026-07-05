@@ -1,4 +1,5 @@
 import { LinkCodeCodeValidationError, normalizeLinkCodeCode } from './linkCodeCodes.ts'
+import { isLinkCodeStatus, type LinkCodeStatus } from './linkCodeTypes.ts'
 
 export const defaultRawContentType = 'text/plain; charset=utf-8'
 export const defaultRawStatusCode = 200
@@ -25,6 +26,7 @@ type LinkCodeDetailsParams = {
   displayName: string
   id: string
   responseConfig: ResponseConfig
+  status: LinkCodeStatus
 }
 
 export class LinkCodeDetailsValidationError extends Error {
@@ -119,11 +121,20 @@ const normalizeOptionalLinkCodeCode = (code?: string) => {
   }
 }
 
+export const normalizeLinkCodeStatus = (status: unknown) => {
+  if (!isLinkCodeStatus(status)) {
+    throw validationError('Choose Draft, Active, or Disabled status.')
+  }
+
+  return status
+}
+
 export const normalizeLinkCodeDetails = ({
   code,
   displayName,
   id,
-  responseConfig
+  responseConfig,
+  status
 }: LinkCodeDetailsParams): LinkCodeDetailsParams => {
   const normalizedId = id.trim()
   const normalizedDisplayName = normalizeLinkCodeDisplayName(displayName)
@@ -142,6 +153,7 @@ export const normalizeLinkCodeDetails = ({
     ...(normalizedCode === undefined ? {} : { code: normalizedCode }),
     displayName: normalizedDisplayName,
     id: normalizedId,
-    responseConfig: normalizeResponseConfig(responseConfig)
+    responseConfig: normalizeResponseConfig(responseConfig),
+    status: normalizeLinkCodeStatus(status)
   }
 }

@@ -43,8 +43,19 @@ describe('Link Code edit form', () => {
       displayName: 'Launch page',
       id: 'link-code-id',
       redirectUrl: 'https://example.com/launch',
-      responseMode: 'redirect'
+      responseMode: 'redirect',
+      status: 'draft'
     }))
+  })
+
+  it('updates status in editable state', () => {
+    const form = updateLinkCodeEditFormField(
+      createLinkCodeEditFormState(redirectLinkCode),
+      'status',
+      'disabled'
+    )
+
+    expect(form.status).toBe('disabled')
   })
 
   it('tracks custom code changes for premium edit forms', () => {
@@ -88,7 +99,8 @@ describe('Link Code edit form', () => {
         contentType: 'text/plain; charset=utf-8',
         mode: 'raw_content',
         statusCode: 202
-      }
+      },
+      status: 'draft'
     })
   })
 

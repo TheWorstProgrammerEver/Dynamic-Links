@@ -14,7 +14,8 @@ describe('Link Code details', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: ' https://example.com/launch '
-      }
+      },
+      status: 'active'
     })).toEqual({
       code: 'go',
       displayName: 'Launch page',
@@ -22,7 +23,8 @@ describe('Link Code details', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'https://example.com/launch'
-      }
+      },
+      status: 'active'
     })
   })
 
@@ -33,7 +35,8 @@ describe('Link Code details', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'https://example.com'
-      }
+      },
+      status: 'draft'
     })).toThrow(LinkCodeDetailsValidationError)
 
     expect(() => normalizeLinkCodeDetails({
@@ -42,7 +45,8 @@ describe('Link Code details', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'https://example.com'
-      }
+      },
+      status: 'draft'
     })).toThrow(LinkCodeDetailsValidationError)
   })
 
@@ -53,7 +57,8 @@ describe('Link Code details', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'not a url'
-      }
+      },
+      status: 'draft'
     })).toThrow(/valid redirect URL/)
 
     expect(() => normalizeLinkCodeDetails({
@@ -62,7 +67,8 @@ describe('Link Code details', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'javascript:alert(1)'
-      }
+      },
+      status: 'draft'
     })).toThrow(/http/)
 
     expect(() => normalizeLinkCodeDetails({
@@ -71,7 +77,8 @@ describe('Link Code details', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'https://example.com/\r\nx-extra: value'
-      }
+      },
+      status: 'draft'
     })).toThrow(/line breaks/)
   })
 
@@ -83,8 +90,21 @@ describe('Link Code details', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'https://example.com'
-      }
+      },
+      status: 'draft'
     })).toThrow(/letters, numbers/)
+  })
+
+  it('validates Link Code status', () => {
+    expect(() => normalizeLinkCodeDetails({
+      displayName: 'Launch page',
+      id: 'link-code-id',
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: 'https://example.com'
+      },
+      status: 'published' as never
+    })).toThrow(/Draft, Active, or Disabled/)
   })
 
   it('normalizes raw content metadata', () => {
@@ -96,7 +116,8 @@ describe('Link Code details', () => {
         contentType: ' ',
         mode: 'raw_content',
         statusCode: 202
-      }
+      },
+      status: 'disabled'
     })).toEqual({
       displayName: 'Content page',
       id: 'link-code-id',
@@ -105,7 +126,8 @@ describe('Link Code details', () => {
         contentType: defaultRawContentType,
         mode: 'raw_content',
         statusCode: 202
-      }
+      },
+      status: 'disabled'
     })
   })
 
@@ -118,7 +140,8 @@ describe('Link Code details', () => {
         contentType: 'text/plain',
         mode: 'raw_content',
         statusCode: 199
-      }
+      },
+      status: 'draft'
     })).toThrow(/200 to 599/)
 
     expect(() => normalizeLinkCodeDetails({
@@ -129,7 +152,8 @@ describe('Link Code details', () => {
         contentType: 'text/plain',
         mode: 'raw_content',
         statusCode: 204
-      }
+      },
+      status: 'draft'
     })).toThrow(/response body/)
 
     expect(() => normalizeLinkCodeDetails({
@@ -140,7 +164,8 @@ describe('Link Code details', () => {
         contentType: 'text/plain\r\nx-extra: value',
         mode: 'raw_content',
         statusCode: 200
-      }
+      },
+      status: 'draft'
     })).toThrow(/line breaks/)
   })
 })

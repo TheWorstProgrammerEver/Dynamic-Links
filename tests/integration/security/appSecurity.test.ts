@@ -503,7 +503,8 @@ describe('app security integration', () => {
         responseConfig: {
           mode: 'redirect',
           redirectUrl: ' https://example.com/second?source=update '
-        }
+        },
+        status: 'active'
       })
 
       expect(error).toBeFalsy()
@@ -553,7 +554,8 @@ describe('app security integration', () => {
           contentType: 'application/json; charset=utf-8',
           mode: 'raw_content',
           statusCode: 202
-        }
+        },
+        status: 'active'
       })
 
       expect(error).toBeFalsy()
@@ -573,6 +575,69 @@ describe('app security integration', () => {
       expect(secondResponse.status).toBe(202)
       expect(secondResponse.headers.get('content-type')).toBe('application/json; charset=utf-8')
       expect(await secondResponse.text()).toBe('{"message":"second content"}')
+    } finally {
+      await deleteLinkCode(createdId)
+    }
+  })
+
+  test('status updates control public Link Code resolution through the app function', async () => {
+    const securityFixture = requireFixture()
+    const code = `${securityFixture.prefix}-status-publish`
+    let createdId: string | undefined
+
+    try {
+      createdId = await insertLinkCode({
+        ownerUserId: securityFixture.users.owner.id,
+        displayName: `${securityFixture.prefix} status publish Link Code`,
+        code,
+        redirectUrl: 'https://example.com/published',
+        status: 'draft'
+      })
+
+      const draftResponse = await fetchPublicLinkCode(code)
+
+      expect(draftResponse.status).toBe(404)
+
+      const activeUpdate = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+        displayName: `${securityFixture.prefix} status publish Link Code`,
+        id: createdId,
+        responseConfig: {
+          mode: 'redirect',
+          redirectUrl: 'https://example.com/published'
+        },
+        status: 'active'
+      })
+
+      expect(activeUpdate.error).toBeFalsy()
+      expect(activeUpdate.data).toEqual(expect.objectContaining({
+        id: createdId,
+        status: 'active'
+      }))
+
+      const activeResponse = await fetchPublicLinkCode(code)
+
+      expect(activeResponse.status).toBe(302)
+      expect(activeResponse.headers.get('location')).toBe('https://example.com/published')
+
+      const disabledUpdate = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+        displayName: `${securityFixture.prefix} status publish Link Code`,
+        id: createdId,
+        responseConfig: {
+          mode: 'redirect',
+          redirectUrl: 'https://example.com/published'
+        },
+        status: 'disabled'
+      })
+
+      expect(disabledUpdate.error).toBeFalsy()
+      expect(disabledUpdate.data).toEqual(expect.objectContaining({
+        id: createdId,
+        status: 'disabled'
+      }))
+
+      const disabledResponse = await fetchPublicLinkCode(code)
+
+      expect(disabledResponse.status).toBe(404)
     } finally {
       await deleteLinkCode(createdId)
     }
@@ -768,7 +833,8 @@ describe('app security integration', () => {
           contentType: 'text/html; charset=utf-8',
           mode: 'raw_content',
           statusCode: 202
-        }
+        },
+        status: 'active'
       })
 
       expect(error).toBeFalsy()
@@ -781,12 +847,13 @@ describe('app security integration', () => {
           mode: 'raw_content',
           statusCode: 202
         },
-        responseMode: 'raw_content'
+        responseMode: 'raw_content',
+        status: 'active'
       }))
 
       const { data: row, error: rowError } = await createAdminClient()
         .from('link_codes')
-        .select('display_name, redirect_url, raw_content, raw_content_type, raw_status_code, response_mode')
+        .select('display_name, redirect_url, raw_content, raw_content_type, raw_status_code, response_mode, status')
         .eq('id', createdId)
         .single()
 
@@ -797,7 +864,8 @@ describe('app security integration', () => {
         raw_content_type: 'text/html; charset=utf-8',
         raw_status_code: 202,
         redirect_url: null,
-        response_mode: 'raw_content'
+        response_mode: 'raw_content',
+        status: 'active'
       })
     } finally {
       await deleteLinkCode(createdId)
@@ -832,7 +900,8 @@ describe('app security integration', () => {
         responseConfig: {
           mode: 'redirect',
           redirectUrl: 'https://example.com/custom'
-        }
+        },
+        status: 'draft'
       })
 
       expect(error).toBeFalsy()
@@ -868,7 +937,8 @@ describe('app security integration', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'https://example.com/visible'
-      }
+      },
+      status: 'active'
     })
 
     expect(error).toBeTruthy()
@@ -898,7 +968,8 @@ describe('app security integration', () => {
         contentType: 'text/plain; charset=utf-8',
         mode: 'raw_content',
         statusCode: 200
-      }
+      },
+      status: 'draft'
     })
 
     expect(error).toBeTruthy()
@@ -925,11 +996,37 @@ describe('app security integration', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'javascript:alert(1)'
-      }
+      },
+      status: 'active'
     })
 
     expect(error).toBeTruthy()
     expect(data).toBeFalsy()
+  })
+
+  test('Link Code updates reject invalid statuses through the app function', async () => {
+    const securityFixture = requireFixture()
+    const { data, error } = await invokeApp(ownerClient, appRequestIdentifiers.updateLinkCodeDetails, {
+      displayName: `${securityFixture.prefix} invalid status`,
+      id: securityFixture.linkCodes.visible,
+      responseConfig: {
+        mode: 'redirect',
+        redirectUrl: 'https://example.com/visible'
+      },
+      status: 'published'
+    })
+
+    expect(error).toBeTruthy()
+    expect(data).toBeFalsy()
+
+    const { data: row, error: rowError } = await createAdminClient()
+      .from('link_codes')
+      .select('status')
+      .eq('id', securityFixture.linkCodes.visible)
+      .single()
+
+    expect(rowError).toBeFalsy()
+    expect(row?.status).toBe('active')
   })
 
   test('Link Code owners cannot directly store unsafe redirect URLs', async () => {
@@ -1006,7 +1103,8 @@ describe('app security integration', () => {
       responseConfig: {
         mode: 'redirect',
         redirectUrl: 'https://example.com/stolen'
-      }
+      },
+      status: 'active'
     })
 
     expect(error).toBeTruthy()
@@ -1014,7 +1112,7 @@ describe('app security integration', () => {
 
     const { data: row, error: rowError } = await createAdminClient()
       .from('link_codes')
-      .select('display_name, redirect_url, response_mode')
+      .select('display_name, redirect_url, response_mode, status')
       .eq('id', securityFixture.linkCodes.hidden)
       .single()
 
@@ -1022,7 +1120,8 @@ describe('app security integration', () => {
     expect(row).toEqual({
       display_name: `${securityFixture.prefix} hidden Link Code`,
       redirect_url: null,
-      response_mode: 'raw_content'
+      response_mode: 'raw_content',
+      status: 'draft'
     })
   })
 

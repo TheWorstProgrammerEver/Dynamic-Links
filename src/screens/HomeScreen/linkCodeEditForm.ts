@@ -23,7 +23,7 @@ export type LinkCodeEditFormState = {
   status: LinkCodeStatus
 }
 
-export type LinkCodeEditFormField = keyof Omit<LinkCodeEditFormState, 'canEditCustomLinkCode' | 'id' | 'status'>
+export type LinkCodeEditFormField = keyof Omit<LinkCodeEditFormState, 'canEditCustomLinkCode' | 'id'>
 
 export const createLinkCodeEditFormState = (
   linkCode: LinkCodeSummary,
@@ -58,6 +58,13 @@ export const updateLinkCodeEditFormField = (
     }
   }
 
+  if (field === 'status') {
+    return {
+      ...form,
+      status: value as LinkCodeStatus
+    }
+  }
+
   return {
     ...form,
     [field]: value
@@ -80,7 +87,8 @@ export const linkCodeEditFormToUpdateParams = (
       contentType: form.rawContentType,
       mode: 'raw_content',
       statusCode: Number(form.rawStatusCode)
-    }
+    },
+  status: form.status
 })
 
 export const formatLinkCodeResponseConfig = (linkCode: LinkCodeSummary) => {
