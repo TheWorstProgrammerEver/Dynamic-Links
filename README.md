@@ -32,6 +32,10 @@ Press `Ctrl+C` to stop dev processes started by the script. Supabase containers 
 
 `publicLinks.host` is the configured host used when the authenticated app shows or copies public Link Code URLs.
 
+## Configuration And Deployment
+
+Production Netlify and Supabase setup is documented in [README.ENV.md](README.ENV.md). Use it as the deployment contract for required environment variables, hosted Supabase dashboard settings, Edge Function deployment, and smoke checks.
+
 ## Public Link Codes
 
 The canonical public Link Code URL convention is:
