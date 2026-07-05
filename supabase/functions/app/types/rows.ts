@@ -6,9 +6,7 @@ export type LinkCodeRow = {
   code: string
   response_mode: LinkCodeResponseMode
   redirect_url: string | null
-  raw_content: string | null
-  raw_content_type: string | null
-  raw_status_code: number | null
+  raw_response_message: string | null
   status: LinkCodeStatus
   created_date: string
 }

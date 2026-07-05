@@ -35,9 +35,7 @@ export const LinkCodeEditDialog = ({
   const redirectModeId = useId()
   const rawContentModeId = useId()
   const redirectUrlId = useId()
-  const rawContentId = useId()
-  const rawContentTypeId = useId()
-  const rawStatusCodeId = useId()
+  const rawResponseMessageId = useId()
   const errorId = useId()
 
   return (
@@ -154,44 +152,17 @@ export const LinkCodeEditDialog = ({
           )}
 
           {form.responseMode === 'raw_content' && (
-            <>
-              <label htmlFor={rawStatusCodeId}>
-                Status code
-                <input
-                  id={rawStatusCodeId}
-                  inputMode="numeric"
-                  max="599"
-                  min="200"
-                  name="rawStatusCode"
-                  onChange={(event) => onChange('rawStatusCode', event.currentTarget.value)}
-                  type="number"
-                  value={form.rawStatusCode}
-                />
-              </label>
-
-              <label htmlFor={rawContentTypeId}>
-                Content type
-                <input
-                  id={rawContentTypeId}
-                  name="rawContentType"
-                  onChange={(event) => onChange('rawContentType', event.currentTarget.value)}
-                  type="text"
-                  value={form.rawContentType}
-                />
-              </label>
-
-              <label htmlFor={rawContentId}>
-                Response content
-                <textarea
-                  className={styles.contentEditor}
-                  id={rawContentId}
-                  name="rawContent"
-                  onChange={(event) => onChange('rawContent', event.currentTarget.value)}
-                  rows={8}
-                  value={form.rawContent}
-                />
-              </label>
-            </>
+            <label htmlFor={rawResponseMessageId}>
+              HTTP response message
+              <textarea
+                className={styles.contentEditor}
+                id={rawResponseMessageId}
+                name="rawResponseMessage"
+                onChange={(event) => onChange('rawResponseMessage', event.currentTarget.value)}
+                rows={12}
+                value={form.rawResponseMessage}
+              />
+            </label>
           )}
 
           {error && (

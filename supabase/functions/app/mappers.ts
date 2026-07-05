@@ -1,4 +1,4 @@
-import { defaultRawContentType, defaultRawStatusCode } from '../../../common/linkCodeDetails.ts'
+import { defaultRawResponseMessage } from '../../../common/rawHttpResponse.ts'
 import type { LinkCodeRow } from './types/rows.ts'
 
 export const linkCodeFromRow = (row: LinkCodeRow) => ({
@@ -11,10 +11,8 @@ export const linkCodeFromRow = (row: LinkCodeRow) => ({
       redirectUrl: row.redirect_url ?? ''
     }
     : {
-      content: row.raw_content ?? '',
-      contentType: row.raw_content_type ?? defaultRawContentType,
       mode: 'raw_content' as const,
-      statusCode: row.raw_status_code ?? defaultRawStatusCode
+      responseMessage: row.raw_response_message ?? defaultRawResponseMessage
     },
   responseMode: row.response_mode,
   status: row.status,

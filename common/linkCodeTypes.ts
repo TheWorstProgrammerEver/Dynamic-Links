@@ -14,10 +14,8 @@ export type LinkCodeRedirectResponseConfig = {
 }
 
 export type LinkCodeRawContentResponseConfig = {
-  content: string
-  contentType: string
   mode: 'raw_content'
-  statusCode: number
+  responseMessage: string
 }
 
 export type LinkCodeResponseConfig = LinkCodeRedirectResponseConfig | LinkCodeRawContentResponseConfig

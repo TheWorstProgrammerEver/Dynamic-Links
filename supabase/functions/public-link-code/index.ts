@@ -9,9 +9,7 @@ import { publicLinkCodeFromResolverPathname } from '../../../common/linkCodePubl
 type PublicLinkCodeRow = PublicLinkCodeResolverRow
 
 const publicLinkCodeFields = [
-  'raw_content',
-  'raw_content_type',
-  'raw_status_code',
+  'raw_response_message',
   'redirect_url',
   'response_mode',
   'status'
@@ -52,15 +50,15 @@ const redirectTo = (location: string) => new Response(null, {
   status: 302
 })
 
-const respondWithRawContent = (resolution: Extract<PublicLinkCodeResolution, { responseMode: 'raw_content' }>) => (
-  new Response(resolution.body, {
-    headers: {
-      ...responseHeaders,
-      'content-type': resolution.contentType
-    },
-    status: resolution.statusCode
+const respondWithRawContent = (resolution: Extract<PublicLinkCodeResolution, { responseMode: 'raw_content' }>) => {
+  const body = [204, 205, 304].includes(resolution.status) ? null : resolution.body
+
+  return new Response(body, {
+    headers: resolution.headers,
+    status: resolution.status,
+    statusText: resolution.statusText
   })
-)
+}
 
 const requireEnvironmentValue = (name: string) => {
   const value = Deno.env.get(name)
