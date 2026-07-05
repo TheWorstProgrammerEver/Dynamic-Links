@@ -1,6 +1,12 @@
 export type LinkCodeResponseMode = 'redirect' | 'raw_content'
 
-export type LinkCodeStatus = 'draft' | 'active' | 'disabled'
+export const linkCodeStatuses = ['draft', 'active', 'disabled'] as const
+
+export type LinkCodeStatus = typeof linkCodeStatuses[number]
+
+export const isLinkCodeStatus = (value: unknown): value is LinkCodeStatus => (
+  typeof value === 'string' && linkCodeStatuses.includes(value as LinkCodeStatus)
+)
 
 export type LinkCodeRedirectResponseConfig = {
   mode: 'redirect'
@@ -52,4 +58,5 @@ export type UpdateLinkCodeDetailsParams = {
   displayName: string
   id: string
   responseConfig: LinkCodeResponseConfig
+  status: LinkCodeStatus
 }

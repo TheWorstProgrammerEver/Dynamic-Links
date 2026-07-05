@@ -1,9 +1,10 @@
 import { appRequestIdentifiers } from '../../../../common/appRequestIdentifiers.ts'
-import type {
-  CreateLinkCodeParams,
-  DeleteLinkCodeParams,
-  LinkCodeResponseConfig,
-  UpdateLinkCodeDetailsParams
+import {
+  isLinkCodeStatus,
+  type CreateLinkCodeParams,
+  type DeleteLinkCodeParams,
+  type LinkCodeResponseConfig,
+  type UpdateLinkCodeDetailsParams
 } from '../../../../common/linkCodeTypes.ts'
 import { HttpError } from '../helpers.ts'
 import {
@@ -51,9 +52,14 @@ const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsPara
     throw new HttpError(400, 'Link Code details are required.')
   }
 
-  const { code, displayName, id, responseConfig } = params
+  const { code, displayName, id, responseConfig, status } = params
 
-  if (typeof id !== 'string' || typeof displayName !== 'string' || !isRecord(responseConfig)) {
+  if (
+    typeof id !== 'string'
+    || typeof displayName !== 'string'
+    || !isRecord(responseConfig)
+    || !isLinkCodeStatus(status)
+  ) {
     throw new HttpError(400, 'Link Code details are required.')
   }
 
@@ -73,7 +79,8 @@ const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsPara
       responseConfig: {
         mode: 'redirect',
         redirectUrl: responseConfig.redirectUrl
-      }
+      },
+      status
     }
   }
 
@@ -97,7 +104,8 @@ const updateLinkCodeDetailsParams = (params: unknown): UpdateLinkCodeDetailsPara
         contentType,
         mode: 'raw_content',
         statusCode
-      } satisfies LinkCodeResponseConfig
+      } satisfies LinkCodeResponseConfig,
+      status
     }
   }
 

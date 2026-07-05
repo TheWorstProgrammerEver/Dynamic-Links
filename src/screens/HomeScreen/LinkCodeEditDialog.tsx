@@ -31,6 +31,7 @@ export const LinkCodeEditDialog = ({
   const formId = useId()
   const codeInputId = useId()
   const nameInputId = useId()
+  const statusSelectId = useId()
   const redirectModeId = useId()
   const rawContentModeId = useId()
   const redirectUrlId = useId()
@@ -97,6 +98,20 @@ export const LinkCodeEditDialog = ({
               type="text"
               value={form.displayName}
             />
+          </label>
+
+          <label htmlFor={statusSelectId}>
+            Status
+            <select
+              id={statusSelectId}
+              name="status"
+              onChange={(event) => onChange('status', event.currentTarget.value)}
+              value={form.status}
+            >
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+              <option value="disabled">Disabled</option>
+            </select>
           </label>
 
           <fieldset className={styles.modeChoices}>

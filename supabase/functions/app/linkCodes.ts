@@ -204,6 +204,7 @@ export const updateOwnedLinkCodeDetails = async (
         raw_content: null,
         redirect_url: responseConfig.redirectUrl,
         response_mode: responseConfig.mode,
+        status: details.status,
         updated_date: new Date().toISOString().slice(0, 10)
       }
       : {
@@ -213,6 +214,7 @@ export const updateOwnedLinkCodeDetails = async (
         raw_status_code: responseConfig.statusCode,
         redirect_url: null,
         response_mode: responseConfig.mode,
+        status: details.status,
         updated_date: new Date().toISOString().slice(0, 10)
       }
     const { data, error } = await client
